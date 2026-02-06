@@ -1,0 +1,15 @@
+# Xcode
+DerivedData/
+*.xcuserdata
+*.xcworkspace
+
+# Python
+Scripts/.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Build
+build/
