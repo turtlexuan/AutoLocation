@@ -10,10 +10,13 @@
 		08A74761EE9C2F2EFD7C90F3 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BA2F3BEA9B410D9E62C427 /* SidebarView.swift */; };
 		0A6F2EEECDDF5BCDCFB7A785 /* DeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 219BF02AB3FF182D6A17439F /* DeviceManager.swift */; };
 		1AFF8CCF486777D8AF889304 /* CoordinateInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F274AE3F19D6A602E1C8C9 /* CoordinateInputView.swift */; };
+		1B2E2C217D3EC73E73EC7A8E /* MovementControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA52417D16967142583A17F /* MovementControlPanel.swift */; };
 		358006B723E276F9ECE6653F /* MapContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA664C7D807F300BD6096DE3 /* MapContainerView.swift */; };
 		7D5920E4D98118C947011FD5 /* PythonBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F38FC55291A7B8F83F4F4D /* PythonBridge.swift */; };
 		940D25666F6BE5C4A5E8BC20 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43EC5BDD700AF638C71486CA /* ContentView.swift */; };
+		967CBC368654C685830B0ED9 /* JoystickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0A41690A79690B0CB8B309 /* JoystickView.swift */; };
 		A924220953E7D16CF9996059 /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775CD0B6690E4A0E11CD81B5 /* Device.swift */; };
+		BFCD26A028A8CF7B014459C5 /* MovementEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEFF998810102414EEA0477 /* MovementEngine.swift */; };
 		C2BDC00BB1C4AEE87C8EFFED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52918D9BB9ADD7D410D15407 /* AppState.swift */; };
 		CF68A811C0DA3F078F672314 /* AutoLocationApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5E4458620BF5342A262418 /* AutoLocationApp.swift */; };
 		E09C0D6401A796616EE0974E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2392A8F7296B3C6BD950A613 /* Assets.xcassets */; };
@@ -27,12 +30,15 @@
 		335D95E03A94026341FB4DDB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		43EC5BDD700AF638C71486CA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		49B1FC5B913DF5C2DDAA1266 /* AutoLocation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoLocation.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C0A41690A79690B0CB8B309 /* JoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickView.swift; sourceTree = "<group>"; };
 		52918D9BB9ADD7D410D15407 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		775CD0B6690E4A0E11CD81B5 /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
 		BC5E4458620BF5342A262418 /* AutoLocationApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoLocationApp.swift; sourceTree = "<group>"; };
 		C3ED039AEB66DA5E1D117964 /* AutoLocation.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoLocation.entitlements; sourceTree = "<group>"; };
 		D6F38FC55291A7B8F83F4F4D /* PythonBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonBridge.swift; sourceTree = "<group>"; };
+		EBA52417D16967142583A17F /* MovementControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementControlPanel.swift; sourceTree = "<group>"; };
 		FA664C7D807F300BD6096DE3 /* MapContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapContainerView.swift; sourceTree = "<group>"; };
+		FDEFF998810102414EEA0477 /* MovementEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementEngine.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -40,6 +46,7 @@
 			isa = PBXGroup;
 			children = (
 				219BF02AB3FF182D6A17439F /* DeviceManager.swift */,
+				FDEFF998810102414EEA0477 /* MovementEngine.swift */,
 				D6F38FC55291A7B8F83F4F4D /* PythonBridge.swift */,
 			);
 			path = Services;
@@ -58,7 +65,9 @@
 			children = (
 				43EC5BDD700AF638C71486CA /* ContentView.swift */,
 				04F274AE3F19D6A602E1C8C9 /* CoordinateInputView.swift */,
+				4C0A41690A79690B0CB8B309 /* JoystickView.swift */,
 				FA664C7D807F300BD6096DE3 /* MapContainerView.swift */,
+				EBA52417D16967142583A17F /* MovementControlPanel.swift */,
 				28BA2F3BEA9B410D9E62C427 /* SidebarView.swift */,
 			);
 			path = Views;
@@ -171,7 +180,10 @@
 				1AFF8CCF486777D8AF889304 /* CoordinateInputView.swift in Sources */,
 				A924220953E7D16CF9996059 /* Device.swift in Sources */,
 				0A6F2EEECDDF5BCDCFB7A785 /* DeviceManager.swift in Sources */,
+				967CBC368654C685830B0ED9 /* JoystickView.swift in Sources */,
 				358006B723E276F9ECE6653F /* MapContainerView.swift in Sources */,
+				1B2E2C217D3EC73E73EC7A8E /* MovementControlPanel.swift in Sources */,
+				BFCD26A028A8CF7B014459C5 /* MovementEngine.swift in Sources */,
 				7D5920E4D98118C947011FD5 /* PythonBridge.swift in Sources */,
 				08A74761EE9C2F2EFD7C90F3 /* SidebarView.swift in Sources */,
 			);

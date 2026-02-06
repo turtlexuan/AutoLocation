@@ -19,6 +19,8 @@ class AppState {
     var isBridgeReady: Bool = false
     var tunnelCommand: String? = nil  // Command to show user for starting tunnel
 
+    var isMovementActive: Bool = false
+
     var selectedDevice: Device? {
         devices.first { $0.udid == selectedDeviceUDID }
     }

@@ -166,6 +166,24 @@ class DeviceManager {
         }
     }
 
+    /// Lightweight location update for movement engine — no UI state changes.
+    func setLocationSilent(latitude: Double, longitude: Double) async {
+        guard let udid = appState.selectedDeviceUDID else { return }
+
+        do {
+            let command: [String: Any] = [
+                "command": "set_location",
+                "udid": udid,
+                "latitude": latitude,
+                "longitude": longitude
+            ]
+            _ = try await bridge.send(command: command)
+            appState.isSimulating = true
+        } catch {
+            appState.statusMessage = "Movement update failed: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - GPX Playback
 
     func playGPX(path: String, speed: Double = 1.0) async {
