@@ -1,18 +1,20 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 struct MapContainerView: View {
     var appState: AppState
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
 
-    @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .region(
+    @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 25.0330, longitude: 121.5654),
             span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
         )
-    ))
+    )
     @State private var currentSpan: MKCoordinateSpan?
+    @State private var userLocationHelper = UserLocationHelper()
 
     var body: some View {
         MapReader { proxy in
@@ -96,6 +98,18 @@ struct MapContainerView: View {
                 }
             }
         }
+        .onAppear {
+            userLocationHelper.requestLocation { coordinate in
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    cameraPosition = .region(
+                        MKCoordinateRegion(
+                            center: coordinate,
+                            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                        )
+                    )
+                }
+            }
+        }
         .onMapCameraChange { context in
             currentSpan = context.region.span
         }
@@ -129,5 +143,49 @@ struct MapContainerView: View {
         } else {
             return .blue
         }
+    }
+}
+
+// MARK: - User Location Helper
+
+/// Requests the user's current location via CLLocationManager, triggering the
+/// system permission dialog if needed. Calls back once with the coordinate.
+@MainActor
+private class UserLocationHelper: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    private var completion: ((CLLocationCoordinate2D) -> Void)?
+
+    func requestLocation(completion: @escaping (CLLocationCoordinate2D) -> Void) {
+        self.completion = completion
+        manager.delegate = self
+
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorized:
+            manager.requestLocation()
+        default:
+            break
+        }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorized {
+                manager.requestLocation()
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.first else { return }
+        Task { @MainActor in
+            completion?(location.coordinate)
+            completion = nil
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        // Location unavailable — keep the default map position
     }
 }
