@@ -160,7 +160,7 @@ class DeviceManager {
             _ = try await bridge.send(command: command)
 
             appState.isSimulating = false
-            appState.statusMessage = "Location simulation cleared"
+            appState.statusMessage = "Location cleared — GPS may take a moment to re-acquire real position"
         } catch {
             appState.statusMessage = "Clear location failed: \(error.localizedDescription)"
         }

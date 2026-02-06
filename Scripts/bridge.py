@@ -23,7 +23,6 @@ iOS 17+ Tunnel:
 import json
 import os
 import signal
-import subprocess
 import sys
 import threading
 import time
@@ -120,6 +119,12 @@ _lockdown_cache: dict = {}  # udid -> lockdown client
 _rsd_cache: dict = {}  # udid -> RemoteServiceDiscoveryService (from tunnel)
 _tunnel_process = None  # Background tunnel subprocess
 
+# Persistent DVT session for iOS 17+ location simulation.
+# Keyed by udid -> {"dvt": DvtSecureSocketProxyService, "loc_sim": LocationSimulation}
+# We keep the DVT connection alive between set and clear so that
+# stopLocationSimulation() is called on the same channel that started it.
+_dvt_sessions: dict = {}
+
 
 def get_lockdown(udid: str = None):
     """
@@ -147,6 +152,8 @@ def invalidate_lockdown(udid: str = None):
         del _lockdown_cache[udid]
     if udid and udid in _rsd_cache:
         del _rsd_cache[udid]
+    if udid:
+        _close_dvt_session(udid)
 
 
 def _ios_major_version(lockdown) -> int:
@@ -326,24 +333,65 @@ def _clear_location_legacy(lockdown):
     DtSimulateLocation(lockdown).clear()
 
 
-def _set_location_dvt(rsd, latitude: float, longitude: float):
-    """iOS 17+: use DVT LocationSimulation channel via tunnel RSD."""
+def _get_dvt_session(rsd, udid: str):
+    """
+    Get or create a persistent DVT session for the given device.
+    Returns the LocationSimulation object bound to a long-lived DVT channel.
+    """
     from pymobiledevice3.services.dvt.dvt_secure_socket_proxy import DvtSecureSocketProxyService
     from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
 
-    with DvtSecureSocketProxyService(lockdown=rsd) as dvt:
-        loc_sim = LocationSimulation(dvt)
-        loc_sim.set(latitude, longitude)
+    if udid in _dvt_sessions:
+        return _dvt_sessions[udid]["loc_sim"]
+
+    # Open a new DVT connection (enter the context manager manually to keep it alive)
+    dvt = DvtSecureSocketProxyService(lockdown=rsd)
+    dvt.__enter__()
+    loc_sim = LocationSimulation(dvt)
+    _dvt_sessions[udid] = {"dvt": dvt, "loc_sim": loc_sim}
+    log(f"Opened persistent DVT session for device {udid}")
+    return loc_sim
 
 
-def _clear_location_dvt(rsd):
-    """iOS 17+: use DVT LocationSimulation channel via tunnel RSD."""
-    from pymobiledevice3.services.dvt.dvt_secure_socket_proxy import DvtSecureSocketProxyService
-    from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
+def _close_dvt_session(udid: str):
+    """Close and remove the persistent DVT session for the given device."""
+    session = _dvt_sessions.pop(udid, None)
+    if session:
+        try:
+            session["dvt"].__exit__(None, None, None)
+            log(f"Closed DVT session for device {udid}")
+        except Exception as e:
+            log(f"Error closing DVT session for {udid}: {e}")
 
-    with DvtSecureSocketProxyService(lockdown=rsd) as dvt:
-        loc_sim = LocationSimulation(dvt)
-        loc_sim.clear()
+
+def _set_location_dvt(rsd, udid: str, latitude: float, longitude: float):
+    """iOS 17+: use persistent DVT LocationSimulation channel via tunnel RSD."""
+    loc_sim = _get_dvt_session(rsd, udid)
+    loc_sim.set(latitude, longitude)
+
+
+def _clear_location_dvt(rsd, udid: str):
+    """
+    iOS 17+: stop location simulation by clearing and closing the DVT session.
+
+    The key insight is that iOS ties the simulation to the instruments channel.
+    Closing the DVT connection is the most reliable way to stop simulation
+    (same as what happens when you disconnect Xcode). We also send the
+    stopLocationSimulation message first as a courtesy, with a brief delay
+    to let the device process it before tearing down the channel.
+    """
+    if udid in _dvt_sessions:
+        try:
+            loc_sim = _dvt_sessions[udid]["loc_sim"]
+            loc_sim.clear()
+            log(f"Sent stopLocationSimulation for {udid}")
+        except Exception as e:
+            log(f"stopLocationSimulation failed for {udid} (will close session anyway): {e}")
+        # Give the device a moment to process the stop before we tear down the channel
+        time.sleep(0.5)
+        _close_dvt_session(udid)
+    else:
+        log(f"No active DVT session for {udid}, nothing to clear")
 
 
 def cmd_set_location(latitude: float, longitude: float, udid: str = None) -> dict:
@@ -354,10 +402,13 @@ def cmd_set_location(latitude: float, longitude: float, udid: str = None) -> dic
     try:
         if major >= 17:
             rsd = _get_rsd_for_device(udid)
-            _set_location_dvt(rsd, latitude, longitude)
+            _set_location_dvt(rsd, udid or lockdown.udid, latitude, longitude)
         else:
             _set_location_legacy(lockdown, latitude, longitude)
     except Exception:
+        # On error, clean up the DVT session too
+        if udid:
+            _close_dvt_session(udid)
         invalidate_lockdown(udid)
         raise
 
@@ -372,10 +423,13 @@ def cmd_clear_location(udid: str = None) -> dict:
     try:
         if major >= 17:
             rsd = _get_rsd_for_device(udid)
-            _clear_location_dvt(rsd)
+            _clear_location_dvt(rsd, udid or lockdown.udid)
         else:
             _clear_location_legacy(lockdown)
     except Exception:
+        # On error, clean up the DVT session too
+        if udid:
+            _close_dvt_session(udid)
         invalidate_lockdown(udid)
         raise
 
@@ -617,6 +671,9 @@ def main():
         log("Interrupted, exiting")
     finally:
         _stop_playback_internal()
+        # Close any persistent DVT sessions
+        for udid in list(_dvt_sessions.keys()):
+            _close_dvt_session(udid)
         log("Bridge shut down")
 
 
