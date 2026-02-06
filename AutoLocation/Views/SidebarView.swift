@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     var appState: AppState
     var deviceManager: DeviceManager?
+    var movementEngine: MovementEngine?
 
     @State private var gpxFilePath: String?
     @State private var playbackSpeed: Double = 1.0
@@ -13,6 +14,7 @@ struct SidebarView: View {
                 devicesSection
                 tunnelSection
                 locationSection
+                routePlannerSection
                 gpxSection
             }
             .padding()
@@ -165,6 +167,170 @@ struct SidebarView: View {
                     Text("Start the developer tunnel first to enable location simulation.")
                         .font(.caption2)
                         .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    // MARK: - Route Planner Section
+
+    private var routePlannerSection: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Route Planner", systemImage: "point.topLeft.down.to.point.bottomRight.curvePath.fill")
+                    .font(.headline)
+
+                Divider()
+
+                // Edit Route toggle button
+                Button {
+                    appState.isEditingRoute.toggle()
+                } label: {
+                    Label(
+                        appState.isEditingRoute ? "Done Editing" : "Add Waypoints",
+                        systemImage: appState.isEditingRoute ? "checkmark.circle" : "plus.circle"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .controlSize(.large)
+                .buttonStyle(.borderedProminent)
+                .tint(appState.isEditingRoute ? .orange : .accentColor)
+                .disabled(appState.isFollowingRoute)
+
+                if appState.isEditingRoute {
+                    Text("Tap the map to add waypoints")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Waypoint list
+                if !appState.routeWaypoints.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(appState.routeWaypoints.enumerated()), id: \.element.id) { index, waypoint in
+                            HStack(spacing: 6) {
+                                Text("\(index + 1).")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(
+                                        appState.isFollowingRoute && appState.currentRouteWaypointIndex == index
+                                            ? Color.accentColor
+                                            : Color.primary
+                                    )
+
+                                VStack(alignment: .leading, spacing: 0) {
+                                    if let name = waypoint.name {
+                                        Text(name)
+                                            .font(.caption)
+                                            .lineLimit(1)
+                                    }
+                                    Text(String(format: "%.5f, %.5f", waypoint.coordinate.latitude, waypoint.coordinate.longitude))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    appState.routeWaypoints.remove(at: index)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(appState.isFollowingRoute)
+                            }
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(
+                                        appState.isFollowingRoute && appState.currentRouteWaypointIndex == index
+                                            ? Color.accentColor.opacity(0.1)
+                                            : Color.clear
+                                    )
+                            )
+                        }
+                    }
+
+                    Divider()
+
+                    // Speed mode picker
+                    HStack {
+                        Text("Speed:")
+                            .font(.caption)
+                        Picker("Speed", selection: Binding(
+                            get: { movementEngine?.speedMode ?? .walk },
+                            set: { movementEngine?.speedMode = $0 }
+                        )) {
+                            ForEach(MovementEngine.SpeedMode.allCases) { mode in
+                                Label(mode.rawValue, systemImage: mode.icon)
+                                    .tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    }
+
+                    // Loop toggle
+                    Toggle("Loop Route", isOn: Binding(
+                        get: { appState.shouldLoopRoute },
+                        set: { appState.shouldLoopRoute = $0 }
+                    ))
+                    .font(.caption)
+                    .disabled(appState.isFollowingRoute)
+
+                    // Start / Stop buttons
+                    if appState.routeWaypoints.count >= 2 {
+                        let deviceReady = appState.selectedDevice?.isTunnelReady ?? false
+
+                        HStack(spacing: 8) {
+                            Button {
+                                Task {
+                                    movementEngine?.followRoute(waypoints: appState.routeWaypoints)
+                                }
+                            } label: {
+                                Label("Start Route", systemImage: "play.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .controlSize(.large)
+                            .buttonStyle(.borderedProminent)
+                            .tint(.green)
+                            .disabled(
+                                appState.selectedDevice == nil
+                                || !deviceReady
+                                || appState.isFollowingRoute
+                                || appState.routeWaypoints.count < 2
+                                || appState.isLoading
+                            )
+
+                            Button {
+                                Task {
+                                    movementEngine?.stopRoute()
+                                }
+                            } label: {
+                                Label("Stop Route", systemImage: "stop.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .controlSize(.large)
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .disabled(!appState.isFollowingRoute || appState.isLoading)
+                        }
+                    }
+
+                    // Clear All button
+                    Button {
+                        appState.routeWaypoints.removeAll()
+                        appState.isEditingRoute = false
+                        appState.currentRouteWaypointIndex = 0
+                    } label: {
+                        Label("Clear Route", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .controlSize(.large)
+                    .buttonStyle(.bordered)
+                    .disabled(appState.isFollowingRoute)
                 }
             }
         }

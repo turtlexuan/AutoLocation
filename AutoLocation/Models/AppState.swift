@@ -21,6 +21,13 @@ class AppState {
 
     var isMovementActive: Bool = false
 
+    // Route planner
+    var routeWaypoints: [Waypoint] = []
+    var isEditingRoute: Bool = false
+    var isFollowingRoute: Bool = false
+    var currentRouteWaypointIndex: Int = 0
+    var shouldLoopRoute: Bool = false
+
     var selectedDevice: Device? {
         devices.first { $0.udid == selectedDeviceUDID }
     }

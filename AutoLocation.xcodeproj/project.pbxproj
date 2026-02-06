@@ -16,6 +16,7 @@
 		940D25666F6BE5C4A5E8BC20 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43EC5BDD700AF638C71486CA /* ContentView.swift */; };
 		967CBC368654C685830B0ED9 /* JoystickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0A41690A79690B0CB8B309 /* JoystickView.swift */; };
 		A924220953E7D16CF9996059 /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775CD0B6690E4A0E11CD81B5 /* Device.swift */; };
+		AB5B1D7AA19FD50E8CFC8590 /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A2209A1ACE7D74A01F203E /* Route.swift */; };
 		BC7C4653111B496B336372B9 /* LocationSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA1435BEFE95F41DD982387 /* LocationSearchService.swift */; };
 		BFCD26A028A8CF7B014459C5 /* MovementEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEFF998810102414EEA0477 /* MovementEngine.swift */; };
 		C2BDC00BB1C4AEE87C8EFFED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52918D9BB9ADD7D410D15407 /* AppState.swift */; };
@@ -37,6 +38,7 @@
 		49B1FC5B913DF5C2DDAA1266 /* AutoLocation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoLocation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C0A41690A79690B0CB8B309 /* JoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickView.swift; sourceTree = "<group>"; };
 		52918D9BB9ADD7D410D15407 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		73A2209A1ACE7D74A01F203E /* Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Route.swift; sourceTree = "<group>"; };
 		775CD0B6690E4A0E11CD81B5 /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
 		BC5E4458620BF5342A262418 /* AutoLocationApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoLocationApp.swift; sourceTree = "<group>"; };
 		C3ED039AEB66DA5E1D117964 /* AutoLocation.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoLocation.entitlements; sourceTree = "<group>"; };
@@ -86,6 +88,7 @@
 			children = (
 				52918D9BB9ADD7D410D15407 /* AppState.swift */,
 				775CD0B6690E4A0E11CD81B5 /* Device.swift */,
+				73A2209A1ACE7D74A01F203E /* Route.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -220,6 +223,7 @@
 				1B2E2C217D3EC73E73EC7A8E /* MovementControlPanel.swift in Sources */,
 				BFCD26A028A8CF7B014459C5 /* MovementEngine.swift in Sources */,
 				7D5920E4D98118C947011FD5 /* PythonBridge.swift in Sources */,
+				AB5B1D7AA19FD50E8CFC8590 /* Route.swift in Sources */,
 				08A74761EE9C2F2EFD7C90F3 /* SidebarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

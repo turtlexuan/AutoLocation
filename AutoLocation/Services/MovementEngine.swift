@@ -17,6 +17,9 @@ class MovementEngine {
     private(set) var walkToDestination: CLLocationCoordinate2D?
     private(set) var isWalkingToPoint: Bool = false
 
+    // Route-following state
+    private var routeWaypoints: [Waypoint] = []
+
     // MARK: - Speed Modes
 
     enum SpeedMode: String, CaseIterable, Identifiable {
@@ -73,10 +76,16 @@ class MovementEngine {
             currentBearing = bearing
             currentSpeed = speedMode.maxSpeed * inputMagnitude
 
-            // Cancel walk-to-point if user takes manual control
+            // Cancel walk-to-point and route if user takes manual control
             if isWalkingToPoint {
                 isWalkingToPoint = false
                 walkToDestination = nil
+            }
+            if appState.isFollowingRoute {
+                routeWaypoints = []
+                appState.isFollowingRoute = false
+                appState.currentRouteWaypointIndex = 0
+                appState.statusMessage = "Route cancelled (manual control)"
             }
 
             if !isMoving {
@@ -114,6 +123,46 @@ class MovementEngine {
         walkToDestination = nil
         currentSpeed = 0
         stopMoving()
+    }
+
+    // MARK: - Route Following
+
+    func followRoute(waypoints: [Waypoint]) {
+        guard !waypoints.isEmpty else { return }
+
+        routeWaypoints = waypoints
+        appState.isFollowingRoute = true
+        appState.currentRouteWaypointIndex = 0
+
+        // Navigate to the first waypoint using the existing walk-to logic
+        walkToPoint(waypoints[0].coordinate)
+    }
+
+    func stopRoute() {
+        routeWaypoints = []
+        appState.isFollowingRoute = false
+        appState.currentRouteWaypointIndex = 0
+        stopMoving()
+    }
+
+    private func advanceToNextWaypoint() {
+        let nextIndex = appState.currentRouteWaypointIndex + 1
+
+        if nextIndex < routeWaypoints.count {
+            // More waypoints remain
+            appState.currentRouteWaypointIndex = nextIndex
+            walkToPoint(routeWaypoints[nextIndex].coordinate)
+        } else if appState.shouldLoopRoute {
+            // Route complete, loop back to start
+            appState.currentRouteWaypointIndex = 0
+            walkToPoint(routeWaypoints[0].coordinate)
+        } else {
+            // Route complete, no loop
+            appState.isFollowingRoute = false
+            routeWaypoints = []
+            appState.currentRouteWaypointIndex = 0
+            appState.statusMessage = "Route complete"
+        }
     }
 
     // MARK: - Movement Control
@@ -166,8 +215,21 @@ class MovementEngine {
                 appState.targetCoordinate = dest
                 distanceTraveled += remainingDistance
                 sendLocationUpdate(dest)
-                cancelWalkToPoint()
-                appState.statusMessage = "Arrived at destination"
+
+                if appState.isFollowingRoute {
+                    // Clear current walk-to state before advancing
+                    isWalkingToPoint = false
+                    walkToDestination = nil
+
+                    let waypointName = routeWaypoints[safe: appState.currentRouteWaypointIndex]?.name
+                        ?? "Waypoint \(appState.currentRouteWaypointIndex + 1)"
+                    appState.statusMessage = "Reached \(waypointName)"
+
+                    advanceToNextWaypoint()
+                } else {
+                    cancelWalkToPoint()
+                    appState.statusMessage = "Arrived at destination"
+                }
                 return
             }
 
@@ -270,5 +332,13 @@ class MovementEngine {
         } else {
             return String(format: "%.2f km", distanceTraveled / 1000)
         }
+    }
+}
+
+// MARK: - Safe Array Subscript
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
