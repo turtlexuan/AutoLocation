@@ -4,6 +4,7 @@ struct ContentView: View {
     var appState: AppState
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
+    var locationSearchService: LocationSearchService
 
     @FocusState private var isMapFocused: Bool
     @State private var activeDirections: Set<MovementDirection> = []
@@ -14,20 +15,32 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
         } detail: {
             VStack(spacing: 0) {
-                ZStack(alignment: .bottom) {
+                ZStack {
                     MapContainerView(
                         appState: appState,
                         deviceManager: deviceManager,
                         movementEngine: movementEngine
                     )
 
-                    // Movement control panel overlay
-                    if let engine = movementEngine {
-                        MovementControlPanel(
-                            movementEngine: engine,
+                    // Search bar overlay at top
+                    VStack {
+                        LocationSearchView(
+                            searchService: locationSearchService,
                             appState: appState
                         )
-                        .padding(12)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+
+                        Spacer()
+
+                        // Movement control panel overlay
+                        if let engine = movementEngine {
+                            MovementControlPanel(
+                                movementEngine: engine,
+                                appState: appState
+                            )
+                            .padding(12)
+                        }
                     }
                 }
                 StatusBarView(appState: appState)

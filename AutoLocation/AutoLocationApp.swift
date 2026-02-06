@@ -5,13 +5,15 @@ struct AutoLocationApp: App {
     @State private var appState = AppState()
     @State private var deviceManager: DeviceManager?
     @State private var movementEngine: MovementEngine?
+    @State private var locationSearchService = LocationSearchService()
 
     var body: some Scene {
         WindowGroup {
             ContentView(
                 appState: appState,
                 deviceManager: deviceManager,
-                movementEngine: movementEngine
+                movementEngine: movementEngine,
+                locationSearchService: locationSearchService
             )
             .onAppear {
                 let manager = DeviceManager(appState: appState)
