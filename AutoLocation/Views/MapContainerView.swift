@@ -6,12 +6,13 @@ struct MapContainerView: View {
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
 
-    @State private var cameraPosition: MapCameraPosition = .region(
+    @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 25.0330, longitude: 121.5654),
             span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
         )
-    )
+    ))
+    @State private var currentSpan: MKCoordinateSpan?
 
     var body: some View {
         MapReader { proxy in
@@ -95,16 +96,17 @@ struct MapContainerView: View {
                 }
             }
         }
+        .onMapCameraChange { context in
+            currentSpan = context.region.span
+        }
         .onChange(of: appState.targetCoordinate) { _, newValue in
             guard let coord = newValue else { return }
             // Only animate camera when not actively moving (avoid constant re-centering)
             if movementEngine?.isMoving != true {
+                let span = currentSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
                 withAnimation(.easeInOut(duration: 0.5)) {
                     cameraPosition = .region(
-                        MKCoordinateRegion(
-                            center: coord,
-                            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                        )
+                        MKCoordinateRegion(center: coord, span: span)
                     )
                 }
             }
