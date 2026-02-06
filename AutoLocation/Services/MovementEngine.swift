@@ -11,7 +11,15 @@ class MovementEngine {
     private(set) var currentSpeed: Double = 0      // m/s
     private(set) var isMoving: Bool = false
     private(set) var distanceTraveled: Double = 0  // meters
-    var speedMode: SpeedMode = .walk
+    var speedMode: SpeedMode = .walk {
+        didSet { customSpeedKmh = effectiveMaxSpeed * 3.6 }
+    }
+    var customSpeedKmh: Double = 1.4 * 3.6  // km/h, editable by user
+
+    /// Effective speed in m/s, derived from the user-editable km/h value.
+    var effectiveMaxSpeed: Double {
+        max(customSpeedKmh / 3.6, 0.1)
+    }
 
     // Walk-to-point state
     private(set) var walkToDestination: CLLocationCoordinate2D?
@@ -74,7 +82,7 @@ class MovementEngine {
 
         if magnitude > 0 {
             currentBearing = bearing
-            currentSpeed = speedMode.maxSpeed * inputMagnitude
+            currentSpeed = effectiveMaxSpeed * inputMagnitude
 
             // Cancel walk-to-point and route if user takes manual control
             if isWalkingToPoint {
@@ -106,7 +114,7 @@ class MovementEngine {
 
         walkToDestination = destination
         isWalkingToPoint = true
-        currentSpeed = speedMode.maxSpeed
+        currentSpeed = effectiveMaxSpeed
         currentBearing = Self.bearing(from: current, to: destination)
 
         if currentLocation == nil {
@@ -235,7 +243,7 @@ class MovementEngine {
 
             // Update bearing toward destination
             currentBearing = Self.bearing(from: location, to: dest)
-            currentSpeed = speedMode.maxSpeed
+            currentSpeed = effectiveMaxSpeed
         }
 
         let distance = currentSpeed * updateInterval

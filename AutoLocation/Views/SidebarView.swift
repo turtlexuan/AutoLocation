@@ -7,6 +7,7 @@ struct SidebarView: View {
 
     @State private var gpxFilePath: String?
     @State private var playbackSpeed: Double = 1.0
+    @State private var useCustomSpeed: Bool = false
 
     var body: some View {
         ScrollView {
@@ -255,10 +256,32 @@ struct SidebarView: View {
 
                     Divider()
 
-                    // Speed mode picker
+                    // Speed setting
                     HStack {
                         Text("Speed:")
                             .font(.caption)
+                        Spacer()
+                        Picker("", selection: $useCustomSpeed) {
+                            Text("Preset").tag(false)
+                            Text("Custom").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 140)
+                    }
+
+                    if useCustomSpeed {
+                        HStack(spacing: 4) {
+                            TextField("Speed", value: Binding(
+                                get: { movementEngine?.customSpeedKmh ?? 5.0 },
+                                set: { movementEngine?.customSpeedKmh = $0 }
+                            ), format: .number.precision(.fractionLength(1)))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 70)
+                            Text("km/h")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
                         Picker("Speed", selection: Binding(
                             get: { movementEngine?.speedMode ?? .walk },
                             set: { movementEngine?.speedMode = $0 }
