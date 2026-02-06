@@ -105,34 +105,9 @@ struct SidebarView: View {
                         .tint(.orange)
                         .disabled(appState.isLoading)
 
-                        if let command = appState.tunnelCommand {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Run this in Terminal:")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                HStack {
-                                    Text(command)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .lineLimit(3)
-                                        .textSelection(.enabled)
-                                    Spacer()
-                                    Button {
-                                        NSPasteboard.general.clearContents()
-                                        NSPasteboard.general.setString(command, forType: .string)
-                                    } label: {
-                                        Image(systemName: "doc.on.doc")
-                                    }
-                                    .buttonStyle(.borderless)
-                                }
-                                .padding(8)
-                                .background(Color.black.opacity(0.05))
-                                .cornerRadius(4)
-
-                                Text("Keep that terminal window open, then click Refresh above.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        Text("Admin password will be required to start the tunnel daemon.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }

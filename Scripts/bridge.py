@@ -69,6 +69,18 @@ def ok_response(**kwargs) -> dict:
     return {"status": "ok", **kwargs}
 
 
+def _is_bundled() -> bool:
+    """Return True if running as a PyInstaller bundle."""
+    return getattr(sys, "_MEIPASS", None) is not None
+
+
+def _get_tunneld_command() -> str:
+    """Return the shell command to start the tunneld daemon."""
+    if _is_bundled():
+        return "sudo pymobiledevice3 remote tunneld"
+    return f"sudo {sys.executable} -m pymobiledevice3 remote tunneld"
+
+
 # ---------------------------------------------------------------------------
 # pymobiledevice3 imports (deferred so we can report a friendly error)
 # ---------------------------------------------------------------------------
@@ -183,7 +195,7 @@ def _get_rsd_for_device(udid: str = None) -> "RemoteServiceDiscoveryService":
                 raise RuntimeError(
                     f"No tunnel found for device {udid}. "
                     f"Please start the tunnel daemon first:\n"
-                    f"  sudo {sys.executable} -m pymobiledevice3 remote tunneld"
+                    f"  {_get_tunneld_command()}"
                 )
         else:
             devices = get_tunneld_devices()
@@ -191,7 +203,7 @@ def _get_rsd_for_device(udid: str = None) -> "RemoteServiceDiscoveryService":
                 raise RuntimeError(
                     "No tunneled devices found. "
                     "Please start the tunnel daemon first:\n"
-                    f"  sudo {sys.executable} -m pymobiledevice3 remote tunneld"
+                    f"  {_get_tunneld_command()}"
                 )
             rsd = devices[0]
 
@@ -202,7 +214,7 @@ def _get_rsd_for_device(udid: str = None) -> "RemoteServiceDiscoveryService":
         if "Connection refused" in str(e) or "TunneldConnection" in type(e).__name__:
             raise RuntimeError(
                 "Tunnel daemon is not running. For iOS 17+, you need to start it:\n"
-                f"  sudo {sys.executable} -m pymobiledevice3 remote tunneld\n"
+                f"  {_get_tunneld_command()}\n"
                 "Then click 'Start Tunnel' in the app, or run the command above in Terminal."
             ) from e
         raise
@@ -228,10 +240,7 @@ def cmd_start_tunnel() -> dict:
     except Exception:
         pass
 
-    # Find pymobiledevice3 executable path
-    pmd3_path = os.path.join(os.path.dirname(sys.executable), "pymobiledevice3")
-    if not os.path.exists(pmd3_path):
-        pmd3_path = "pymobiledevice3"
+    tunneld_cmd = _get_tunneld_command()
 
     # We can't start sudo from the bridge directly in a useful way.
     # Return instructions for the user.
@@ -239,11 +248,11 @@ def cmd_start_tunnel() -> dict:
         message=(
             "Tunnel daemon needs to be started with admin privileges.\n"
             "Please run this command in Terminal:\n\n"
-            f"  sudo {sys.executable} -m pymobiledevice3 remote tunneld\n\n"
+            f"  {tunneld_cmd}\n\n"
             "Keep that terminal open, then click Refresh in the app."
         ),
         tunnelRunning=False,
-        command=f"sudo {sys.executable} -m pymobiledevice3 remote tunneld",
+        command=tunneld_cmd,
     )
 
 
@@ -677,5 +686,26 @@ def main():
         log("Bridge shut down")
 
 
+def start_tunneld():
+    """Run the pymobiledevice3 tunneld daemon (requires root privileges).
+
+    This is invoked when the bridge binary is called with --tunneld.
+    It starts the same daemon as `pymobiledevice3 remote tunneld`.
+    """
+    log("Starting tunneld daemon...")
+    try:
+        from pymobiledevice3.cli import cli
+
+        cli(["remote", "tunneld"], standalone_mode=False)
+    except SystemExit:
+        pass
+    except Exception as e:
+        log(f"Failed to start tunneld: {e}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    main()
+    if "--tunneld" in sys.argv:
+        start_tunneld()
+    else:
+        main()

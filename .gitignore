@@ -13,3 +13,8 @@ __pycache__/
 
 # Build
 build/
+
+# PyInstaller output
+Scripts/dist/
+Scripts/build/
+Scripts/*.spec

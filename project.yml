@@ -20,6 +20,17 @@ targets:
       - path: AutoLocation
         excludes:
           - "**/.DS_Store"
+      - path: Scripts/dist/bridge
+        type: folder
+        buildPhase: resources
+        optional: true
+    preBuildScripts:
+      - name: Build Bridge Binary
+        script: |
+          if [ -f "${SRCROOT}/Scripts/build_bridge.sh" ]; then
+            "${SRCROOT}/Scripts/build_bridge.sh"
+          fi
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.autolocation.AutoLocation

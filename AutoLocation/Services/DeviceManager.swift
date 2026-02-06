@@ -92,25 +92,122 @@ class DeviceManager {
         appState.statusMessage = "Checking tunnel..."
         defer { appState.isLoading = false }
 
+        // First check if tunnel is already running
         do {
-            let response = try await bridge.send(command: ["command": "start_tunnel"])
-            let tunnelRunning = response["tunnelRunning"] as? Bool ?? false
-            let message = response["message"] as? String ?? ""
-
-            if tunnelRunning {
-                appState.statusMessage = message
+            let response = try await bridge.send(command: ["command": "check_tunnel"])
+            if response["tunnelRunning"] as? Bool == true {
+                appState.statusMessage = response["message"] as? String ?? "Tunnel running"
                 appState.tunnelCommand = nil
-                // Refresh devices to update tunnel status
                 await refreshDevices()
-            } else {
-                // Need user to run command manually
-                let command = response["command"] as? String
-                appState.tunnelCommand = command
-                appState.statusMessage = "Tunnel required — see instructions below"
+                return
             }
         } catch {
-            appState.statusMessage = "Tunnel check failed: \(error.localizedDescription)"
+            // Continue to start tunnel
         }
+
+        // Start tunnel with admin privileges
+        appState.statusMessage = "Starting tunnel (password may be required)..."
+
+        let command = findTunnelCommand()
+        let escaped = command.replacingOccurrences(of: "\\", with: "\\\\")
+                             .replacingOccurrences(of: "\"", with: "\\\"")
+        let scriptSource = "do shell script \"\(escaped) > /dev/null 2>&1 &\" with administrator privileges"
+
+        let success = await runOsascript(scriptSource)
+
+        guard success else {
+            appState.statusMessage = "Tunnel start cancelled or failed"
+            return
+        }
+
+        // Poll for tunnel readiness (up to ~10 seconds)
+        appState.statusMessage = "Waiting for tunnel to initialize..."
+        for attempt in 1...5 {
+            try? await Task.sleep(for: .seconds(2))
+            do {
+                let response = try await bridge.send(command: ["command": "check_tunnel"])
+                if response["tunnelRunning"] as? Bool == true {
+                    appState.tunnelCommand = nil
+                    appState.statusMessage = "Tunnel started successfully"
+                    await refreshDevices()
+                    return
+                }
+            } catch {
+                // Keep polling
+            }
+            if attempt < 5 {
+                appState.statusMessage = "Waiting for tunnel to initialize... (\(attempt * 2)s)"
+            }
+        }
+
+        appState.statusMessage = "Tunnel process started — click Refresh to check status"
+    }
+
+    /// Run an AppleScript string via /usr/bin/osascript in the background.
+    private func runOsascript(_ source: String) async -> Bool {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+                proc.arguments = ["-e", source]
+                proc.standardOutput = FileHandle.nullDevice
+                proc.standardError = FileHandle.nullDevice
+
+                do {
+                    try proc.run()
+                    proc.waitUntilExit()
+                    continuation.resume(returning: proc.terminationStatus == 0)
+                } catch {
+                    continuation.resume(returning: false)
+                }
+            }
+        }
+    }
+
+    /// Find the best command to run the tunneld daemon.
+    private func findTunnelCommand() -> String {
+        let fileManager = FileManager.default
+
+        // 1. Bundled bridge binary (distributed app)
+        if let resourceURL = Bundle.main.resourceURL {
+            let path = resourceURL.appendingPathComponent("bridge/bridge").path
+            if fileManager.isExecutableFile(atPath: path) {
+                return "'\(path)' --tunneld"
+            }
+        }
+
+        // 2. Dev paths — walk up from executable to find project root
+        var searchRoots: [String] = []
+        if let execURL = Bundle.main.executableURL {
+            var dir = execURL.deletingLastPathComponent()
+            for _ in 0..<12 {
+                searchRoots.append(dir.path)
+                dir = dir.deletingLastPathComponent()
+            }
+        }
+        searchRoots.append(fileManager.currentDirectoryPath)
+
+        for root in searchRoots {
+            // PyInstaller dist bridge
+            let distBridge = root + "/Scripts/dist/bridge/bridge"
+            if fileManager.isExecutableFile(atPath: distBridge) {
+                return "'\(distBridge)' --tunneld"
+            }
+            // pymobiledevice3 CLI in venv
+            let pmd3 = root + "/Scripts/.venv/bin/pymobiledevice3"
+            if fileManager.isExecutableFile(atPath: pmd3) {
+                return "'\(pmd3)' remote tunneld"
+            }
+        }
+
+        // 3. System pymobiledevice3
+        for path in ["/usr/local/bin/pymobiledevice3", "/opt/homebrew/bin/pymobiledevice3"] {
+            if fileManager.isExecutableFile(atPath: path) {
+                return "'\(path)' remote tunneld"
+            }
+        }
+
+        return "pymobiledevice3 remote tunneld"
     }
 
     // MARK: - Location Simulation

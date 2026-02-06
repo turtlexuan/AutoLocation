@@ -41,23 +41,32 @@ actor PythonBridge {
     func start() async throws {
         guard !isRunning else { return }
 
-        let pythonPath = try findPython()
-        let scriptPath = try findBridgeScript()
-
         let proc = Process()
         let stdin = Pipe()
         let stdout = Pipe()
         let stderr = Pipe()
 
-        proc.executableURL = URL(fileURLWithPath: pythonPath)
-        proc.arguments = ["-u", scriptPath]
+        if let bundledPath = findBundledBridge() {
+            // Use bundled standalone binary (no Python needed)
+            print("[PythonBridge] Using bundled bridge binary: \(bundledPath)")
+            proc.executableURL = URL(fileURLWithPath: bundledPath)
+            proc.arguments = []
+            let bridgeDir = (bundledPath as NSString).deletingLastPathComponent
+            proc.currentDirectoryURL = URL(fileURLWithPath: bridgeDir)
+        } else {
+            // Fall back to Python + bridge.py for development
+            let pythonPath = try findPython()
+            let scriptPath = try findBridgeScript()
+            print("[PythonBridge] Using Python bridge: \(pythonPath) \(scriptPath)")
+            proc.executableURL = URL(fileURLWithPath: pythonPath)
+            proc.arguments = ["-u", scriptPath]
+            let scriptsDir = (scriptPath as NSString).deletingLastPathComponent
+            proc.currentDirectoryURL = URL(fileURLWithPath: scriptsDir)
+        }
+
         proc.standardInput = stdin
         proc.standardOutput = stdout
         proc.standardError = stderr
-
-        // Set working directory to the Scripts directory so bridge.py can find its dependencies
-        let scriptsDir = (scriptPath as NSString).deletingLastPathComponent
-        proc.currentDirectoryURL = URL(fileURLWithPath: scriptsDir)
 
         self.process = proc
         self.stdinPipe = stdin
@@ -125,6 +134,33 @@ actor PythonBridge {
         }
 
         return response
+    }
+
+    // MARK: - Find Bundled Bridge
+
+    private func findBundledBridge() -> String? {
+        let fileManager = FileManager.default
+        var candidates: [String] = []
+
+        // 1. Inside app bundle: Contents/Resources/bridge/bridge
+        if let resourceURL = Bundle.main.resourceURL {
+            candidates.append(resourceURL.appendingPathComponent("bridge/bridge").path)
+        }
+
+        // 2. Dev build: Scripts/dist/bridge/bridge relative to project root
+        let projectPaths = findProjectRootCandidates()
+        for root in projectPaths {
+            candidates.append(root + "/Scripts/dist/bridge/bridge")
+        }
+
+        for path in candidates {
+            let resolved = (path as NSString).standardizingPath
+            if fileManager.isExecutableFile(atPath: resolved) {
+                return resolved
+            }
+        }
+
+        return nil
     }
 
     // MARK: - Find Python

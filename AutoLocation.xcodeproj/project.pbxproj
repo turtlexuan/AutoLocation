@@ -21,6 +21,7 @@
 		C2BDC00BB1C4AEE87C8EFFED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52918D9BB9ADD7D410D15407 /* AppState.swift */; };
 		CF68A811C0DA3F078F672314 /* AutoLocationApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5E4458620BF5342A262418 /* AutoLocationApp.swift */; };
 		E09C0D6401A796616EE0974E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2392A8F7296B3C6BD950A613 /* Assets.xcassets */; };
+		F63F1EA63FED2003B4A1EBD9 /* bridge in Resources */ = {isa = PBXBuildFile; fileRef = 3B17AC2B211219967828D77E /* bridge */; };
 		FCEFDD29D3CCE87330BA60D8 /* LocationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1D681B03C20402790A074D /* LocationSearchView.swift */; };
 /* End PBXBuildFile section */
 
@@ -31,6 +32,7 @@
 		2392A8F7296B3C6BD950A613 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		28BA2F3BEA9B410D9E62C427 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		335D95E03A94026341FB4DDB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3B17AC2B211219967828D77E /* bridge */ = {isa = PBXFileReference; lastKnownFileType = folder; name = bridge; path = Scripts/dist/bridge; sourceTree = SOURCE_ROOT; };
 		43EC5BDD700AF638C71486CA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		49B1FC5B913DF5C2DDAA1266 /* AutoLocation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoLocation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C0A41690A79690B0CB8B309 /* JoystickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoystickView.swift; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 		C1F60D8F884769AC2A515D44 = {
 			isa = PBXGroup;
 			children = (
+				3B17AC2B211219967828D77E /* bridge */,
 				CC700B172871C4AADEA25C29 /* AutoLocation */,
 				322D604AF101F74C6407BA19 /* Products */,
 			);
@@ -117,6 +120,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A1FFEDB9B50A8CE8EDADB54D /* Build configuration list for PBXNativeTarget "AutoLocation" */;
 			buildPhases = (
+				43D9BBC0ABA0CCCA8F5B8AA3 /* Build Bridge Binary */,
 				6FD3CAB9C0A173C9B16FC2F0 /* Sources */,
 				A40A047537F964A3BCA8E226 /* Resources */,
 			);
@@ -170,10 +174,33 @@
 			buildActionMask = 2147483647;
 			files = (
 				E09C0D6401A796616EE0974E /* Assets.xcassets in Resources */,
+				F63F1EA63FED2003B4A1EBD9 /* bridge in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		43D9BBC0ABA0CCCA8F5B8AA3 /* Build Bridge Binary */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Bridge Binary";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -f \"${SRCROOT}/Scripts/build_bridge.sh\" ]; then\n  \"${SRCROOT}/Scripts/build_bridge.sh\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		6FD3CAB9C0A173C9B16FC2F0 /* Sources */ = {
