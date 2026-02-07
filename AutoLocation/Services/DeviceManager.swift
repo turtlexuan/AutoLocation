@@ -109,10 +109,17 @@ class DeviceManager {
         appState.statusMessage = "Starting tunnel (password may be required)..."
 
         let command = findTunnelCommand()
+        print("[DeviceManager] Tunnel command: \(command)")
+
+        // Write stderr to a temp log so we can diagnose failures
+        let logPath = NSTemporaryDirectory() + "autolocation_tunnel.log"
         let escaped = command.replacingOccurrences(of: "\\", with: "\\\\")
                              .replacingOccurrences(of: "\"", with: "\\\"")
-        let scriptSource = "do shell script \"\(escaped) > /dev/null 2>&1 &\" with administrator privileges"
+        let logEscaped = logPath.replacingOccurrences(of: "\\", with: "\\\\")
+                                .replacingOccurrences(of: "\"", with: "\\\"")
+        let scriptSource = "do shell script \"\(escaped) > '\(logEscaped)' 2>&1 &\" with administrator privileges"
 
+        print("[DeviceManager] AppleScript: \(scriptSource)")
         let success = await runOsascript(scriptSource)
 
         guard success else {
@@ -120,9 +127,9 @@ class DeviceManager {
             return
         }
 
-        // Poll for tunnel readiness (up to ~10 seconds)
+        // Poll for tunnel readiness (up to ~20 seconds)
         appState.statusMessage = "Waiting for tunnel to initialize..."
-        for attempt in 1...5 {
+        for attempt in 1...10 {
             try? await Task.sleep(for: .seconds(2))
             do {
                 let response = try await bridge.send(command: ["command": "check_tunnel"])
@@ -135,12 +142,20 @@ class DeviceManager {
             } catch {
                 // Keep polling
             }
-            if attempt < 5 {
+            if attempt < 10 {
                 appState.statusMessage = "Waiting for tunnel to initialize... (\(attempt * 2)s)"
             }
         }
 
-        appState.statusMessage = "Tunnel process started — click Refresh to check status"
+        // Read the log to show what went wrong
+        let logContent = (try? String(contentsOfFile: logPath, encoding: .utf8)) ?? ""
+        if !logContent.isEmpty {
+            let lastLines = logContent.components(separatedBy: "\n").suffix(3).joined(separator: " ")
+            print("[DeviceManager] Tunnel log: \(logContent)")
+            appState.statusMessage = "Tunnel may have failed: \(lastLines)"
+        } else {
+            appState.statusMessage = "Tunnel process started — click Refresh to check status"
+        }
     }
 
     /// Run an AppleScript string via /usr/bin/osascript in the background.

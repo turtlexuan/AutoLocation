@@ -42,6 +42,7 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: "YES"
         COMBINE_HIDPI_IMAGES: true
     entitlements:
       path: AutoLocation/AutoLocation.entitlements

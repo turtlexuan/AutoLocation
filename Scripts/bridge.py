@@ -694,11 +694,20 @@ def start_tunneld():
     """
     log("Starting tunneld daemon...")
     try:
-        from pymobiledevice3.cli import cli
+        from pymobiledevice3.tunneld.server import TunneldRunner
+        from pymobiledevice3.remote.common import TunnelProtocol
 
-        cli(["remote", "tunneld"], standalone_mode=False)
-    except SystemExit:
-        pass
+        # TunneldRunner.create() is a blocking call that starts the HTTP server
+        # on 127.0.0.1:49151 (the default tunneld address).
+        TunneldRunner.create(
+            host="127.0.0.1",
+            port=49151,
+            protocol=TunnelProtocol.DEFAULT,
+            usb_monitor=True,
+            wifi_monitor=True,
+            usbmux_monitor=True,
+            mobdev2_monitor=True,
+        )
     except Exception as e:
         log(f"Failed to start tunneld: {e}")
         sys.exit(1)
