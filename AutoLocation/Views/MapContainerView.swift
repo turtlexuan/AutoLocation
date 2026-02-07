@@ -139,9 +139,13 @@ struct MapContainerView: View {
         }
         .onChange(of: appState.targetCoordinate) { _, newValue in
             guard let coord = newValue else { return }
-            // Only animate camera when not actively moving (avoid constant re-centering)
-            if movementEngine?.isMoving != true {
-                let span = currentSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            let span = currentSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            if movementEngine?.isMoving == true {
+                // During movement: keep the arrow centered without animation
+                cameraPosition = .region(
+                    MKCoordinateRegion(center: coord, span: span)
+                )
+            } else {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     cameraPosition = .region(
                         MKCoordinateRegion(center: coord, span: span)
