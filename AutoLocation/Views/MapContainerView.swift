@@ -17,6 +17,7 @@ struct MapContainerView: View {
     @State private var userLocationHelper = UserLocationHelper()
 
     var body: some View {
+        ZStack(alignment: .bottomTrailing) {
         MapReader { proxy in
             Map(position: $cameraPosition) {
                 // MARK: - Current location / target marker
@@ -96,6 +97,29 @@ struct MapContainerView: View {
                         appState.targetCoordinate = coordinate
                     }
                 }
+            }
+        }
+
+            // MARK: - Recenter button
+            if appState.targetCoordinate != nil {
+                Button {
+                    guard let coord = appState.targetCoordinate else { return }
+                    let span = currentSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        cameraPosition = .region(
+                            MKCoordinateRegion(center: coord, span: span)
+                        )
+                    }
+                } label: {
+                    Image(systemName: "location.fill")
+                        .font(.title3)
+                        .padding(10)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                        .shadow(radius: 2)
+                }
+                .buttonStyle(.plain)
+                .padding(12)
             }
         }
         .onAppear {

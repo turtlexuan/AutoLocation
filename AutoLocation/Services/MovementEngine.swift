@@ -12,7 +12,7 @@ class MovementEngine {
     private(set) var isMoving: Bool = false
     private(set) var distanceTraveled: Double = 0  // meters
     var speedMode: SpeedMode = .walk {
-        didSet { customSpeedKmh = effectiveMaxSpeed * 3.6 }
+        didSet { customSpeedKmh = speedMode.maxSpeed * 3.6 }
     }
     var customSpeedKmh: Double = 1.4 * 3.6  // km/h, editable by user
 
@@ -178,10 +178,9 @@ class MovementEngine {
     func startMoving() {
         guard updateTimer == nil else { return }
 
-        // Initialize current location from pin if not set
-        if currentLocation == nil {
-            currentLocation = appState.targetCoordinate
-        }
+        // Always sync with the latest target position so movement starts
+        // from where the user last set the pin, not from a stale position.
+        currentLocation = appState.targetCoordinate
         guard currentLocation != nil else { return }
 
         isMoving = true
