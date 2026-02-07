@@ -1,137 +1,42 @@
 import SwiftUI
 import MapKit
-import CoreLocation
 
 struct MapContainerView: View {
     var appState: AppState
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
 
+    private static let defaultSpan = MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    private static let defaultCenter = CLLocationCoordinate2D(latitude: 25.0330, longitude: 121.5654)
+
     @State private var cameraPosition: MapCameraPosition = .region(
-        MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 25.0330, longitude: 121.5654),
-            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-        )
+        MKCoordinateRegion(center: defaultCenter, span: defaultSpan)
     )
     @State private var currentSpan: MKCoordinateSpan?
     @State private var userLocationHelper = UserLocationHelper()
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-        MapReader { proxy in
-            Map(position: $cameraPosition) {
-                // MARK: - Current location / target marker
-                if let coord = appState.targetCoordinate {
-                    if let engine = movementEngine, engine.isMoving {
-                        // Heading indicator during movement
-                        Annotation("", coordinate: coord) {
-                            Image(systemName: "location.north.fill")
-                                .font(.title2)
-                                .foregroundStyle(.blue)
-                                .rotationEffect(.degrees(engine.currentBearing))
-                                .shadow(color: .blue.opacity(0.5), radius: 3)
-                        }
-                    } else {
-                        Marker("Target", coordinate: coord)
-                            .tint(.red)
-                    }
+            MapReader { proxy in
+                Map(position: $cameraPosition) {
+                    targetMarker
+                    destinationMarker
+                    waypointMarkers
+                    routePolyline
+                    activeRouteSegment
                 }
-
-                // Walk-to destination marker
-                if let dest = movementEngine?.walkToDestination {
-                    Marker("Destination", coordinate: dest)
-                        .tint(.green)
-                }
-
-                // MARK: - Route waypoint markers
-                ForEach(Array(appState.routeWaypoints.enumerated()), id: \.element.id) { index, waypoint in
-                    Annotation(
-                        waypoint.name ?? "Waypoint \(index + 1)",
-                        coordinate: waypoint.coordinate
-                    ) {
-                        ZStack {
-                            Circle()
-                                .fill(waypointColor(for: index))
-                                .frame(width: 28, height: 28)
-                            Circle()
-                                .strokeBorder(.white, lineWidth: 2)
-                                .frame(width: 28, height: 28)
-                            Text("\(index + 1)")
-                                .font(.caption.bold())
-                                .foregroundStyle(.white)
-                        }
-                        .shadow(color: waypointColor(for: index).opacity(0.5), radius: 3)
-                    }
-                }
-
-                // MARK: - Route polyline
-                if appState.routeWaypoints.count >= 2 {
-                    MapPolyline(
-                        coordinates: appState.routeWaypoints.map(\.coordinate)
-                    )
-                    .stroke(.indigo, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-                }
-
-                // MARK: - Active route segment highlight
-                if appState.isFollowingRoute,
-                   appState.currentRouteWaypointIndex < appState.routeWaypoints.count,
-                   let currentLocation = appState.targetCoordinate {
-                    MapPolyline(
-                        coordinates: [
-                            currentLocation,
-                            appState.routeWaypoints[appState.currentRouteWaypointIndex].coordinate
-                        ]
-                    )
-                    .stroke(.orange, style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [8, 6]))
+                .mapStyle(.standard(elevation: .realistic))
+                .onTapGesture { screenPoint in
+                    guard let coordinate = proxy.convert(screenPoint, from: .local) else { return }
+                    handleMapTap(at: coordinate)
                 }
             }
-            .mapStyle(.standard(elevation: .realistic))
-            .onTapGesture { screenPoint in
-                if let coordinate = proxy.convert(screenPoint, from: .local) {
-                    if appState.isEditingRoute {
-                        // In route editing mode: add a waypoint
-                        let waypoint = Waypoint(coordinate: coordinate)
-                        appState.routeWaypoints.append(waypoint)
-                    } else {
-                        // Normal mode: set target coordinate
-                        appState.targetCoordinate = coordinate
-                    }
-                }
-            }
-        }
 
-            // MARK: - Recenter button
-            if appState.targetCoordinate != nil {
-                Button {
-                    guard let coord = appState.targetCoordinate else { return }
-                    let span = currentSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        cameraPosition = .region(
-                            MKCoordinateRegion(center: coord, span: span)
-                        )
-                    }
-                } label: {
-                    Image(systemName: "location.fill")
-                        .font(.title3)
-                        .padding(10)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                        .shadow(radius: 2)
-                }
-                .buttonStyle(.plain)
-                .padding(12)
-            }
+            recenterButton
         }
         .onAppear {
             userLocationHelper.requestLocation { coordinate in
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    cameraPosition = .region(
-                        MKCoordinateRegion(
-                            center: coordinate,
-                            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                        )
-                    )
-                }
+                updateCamera(to: coordinate, animated: true)
             }
         }
         .onMapCameraChange { context in
@@ -139,28 +44,133 @@ struct MapContainerView: View {
         }
         .onChange(of: appState.targetCoordinate) { _, newValue in
             guard let coord = newValue else { return }
-            let span = currentSpan ?? MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-            if movementEngine?.isMoving == true {
-                // During movement: keep the arrow centered without animation
-                cameraPosition = .region(
-                    MKCoordinateRegion(center: coord, span: span)
-                )
-            } else {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    cameraPosition = .region(
-                        MKCoordinateRegion(center: coord, span: span)
-                    )
+            let isMoving = movementEngine?.isMoving == true
+            updateCamera(to: coord, animated: !isMoving)
+        }
+    }
+
+    // MARK: - Map Content
+
+    @MapContentBuilder
+    private var targetMarker: some MapContent {
+        if let coord = appState.targetCoordinate {
+            if let engine = movementEngine, engine.isMoving {
+                Annotation("", coordinate: coord) {
+                    Image(systemName: "location.north.fill")
+                        .font(.title2)
+                        .foregroundStyle(.blue)
+                        .rotationEffect(.degrees(engine.currentBearing))
+                        .shadow(color: .blue.opacity(0.5), radius: 3)
                 }
+            } else {
+                Marker("Target", coordinate: coord)
+                    .tint(.red)
             }
+        }
+    }
+
+    @MapContentBuilder
+    private var destinationMarker: some MapContent {
+        if let dest = movementEngine?.walkToDestination {
+            Marker("Destination", coordinate: dest)
+                .tint(.green)
+        }
+    }
+
+    @MapContentBuilder
+    private var waypointMarkers: some MapContent {
+        ForEach(Array(appState.routeWaypoints.enumerated()), id: \.element.id) { index, waypoint in
+            Annotation(
+                waypoint.name ?? "Waypoint \(index + 1)",
+                coordinate: waypoint.coordinate
+            ) {
+                waypointBadge(index: index)
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private var routePolyline: some MapContent {
+        if appState.routeWaypoints.count >= 2 {
+            MapPolyline(coordinates: appState.routeWaypoints.map(\.coordinate))
+                .stroke(.indigo, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+        }
+    }
+
+    @MapContentBuilder
+    private var activeRouteSegment: some MapContent {
+        if appState.isFollowingRoute,
+           appState.currentRouteWaypointIndex < appState.routeWaypoints.count,
+           let currentLocation = appState.targetCoordinate {
+            MapPolyline(coordinates: [
+                currentLocation,
+                appState.routeWaypoints[appState.currentRouteWaypointIndex].coordinate
+            ])
+            .stroke(.orange, style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [8, 6]))
+        }
+    }
+
+    // MARK: - Subviews
+
+    private func waypointBadge(index: Int) -> some View {
+        let color = waypointColor(for: index)
+        return ZStack {
+            Circle()
+                .fill(color)
+                .frame(width: 28, height: 28)
+            Circle()
+                .strokeBorder(.white, lineWidth: 2)
+                .frame(width: 28, height: 28)
+            Text("\(index + 1)")
+                .font(.caption.bold())
+                .foregroundStyle(.white)
+        }
+        .shadow(color: color.opacity(0.5), radius: 3)
+    }
+
+    @ViewBuilder
+    private var recenterButton: some View {
+        if appState.targetCoordinate != nil {
+            Button {
+                guard let coord = appState.targetCoordinate else { return }
+                updateCamera(to: coord, animated: true)
+            } label: {
+                Image(systemName: "location.fill")
+                    .font(.title3)
+                    .padding(10)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .shadow(radius: 2)
+            }
+            .buttonStyle(.plain)
+            .padding(12)
         }
     }
 
     // MARK: - Helpers
 
-    /// Returns the appropriate color for a waypoint based on route progress.
-    /// - Green: already visited (index < currentRouteWaypointIndex)
-    /// - Orange: current target waypoint (index == currentRouteWaypointIndex) while following
-    /// - Blue: upcoming or when not following a route
+    private func handleMapTap(at coordinate: CLLocationCoordinate2D) {
+        if appState.isEditingRoute {
+            appState.routeWaypoints.append(Waypoint(coordinate: coordinate))
+        } else {
+            appState.targetCoordinate = coordinate
+        }
+    }
+
+    private func updateCamera(to center: CLLocationCoordinate2D, animated: Bool) {
+        let span = currentSpan ?? Self.defaultSpan
+        let region = MKCoordinateRegion(center: center, span: span)
+        if animated {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                cameraPosition = .region(region)
+            }
+        } else {
+            cameraPosition = .region(region)
+        }
+    }
+
+    /// Returns the color for a waypoint based on route progress:
+    /// green = visited, orange = current target, blue = upcoming.
     private func waypointColor(for index: Int) -> Color {
         guard appState.isFollowingRoute else { return .blue }
 
@@ -176,8 +186,6 @@ struct MapContainerView: View {
 
 // MARK: - User Location Helper
 
-/// Requests the user's current location via CLLocationManager, triggering the
-/// system permission dialog if needed. Calls back once with the coordinate.
 @MainActor
 private class UserLocationHelper: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()

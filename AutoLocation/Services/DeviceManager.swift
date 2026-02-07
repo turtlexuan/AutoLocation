@@ -68,12 +68,7 @@ class DeviceManager {
             }
 
             appState.devices = devices
-
-            // Auto-select first device if none selected or selected device is no longer available
-            if appState.selectedDeviceUDID == nil ||
-                !devices.contains(where: { $0.udid == appState.selectedDeviceUDID }) {
-                appState.selectedDeviceUDID = devices.first?.udid
-            }
+            autoSelectDeviceIfNeeded(from: devices)
 
             if devices.isEmpty {
                 appState.statusMessage = "No devices found"
@@ -92,69 +87,83 @@ class DeviceManager {
         appState.statusMessage = "Checking tunnel..."
         defer { appState.isLoading = false }
 
-        // First check if tunnel is already running
-        do {
-            let response = try await bridge.send(command: ["command": "check_tunnel"])
-            if response["tunnelRunning"] as? Bool == true {
-                appState.statusMessage = response["message"] as? String ?? "Tunnel running"
-                appState.tunnelCommand = nil
-                await refreshDevices()
-                return
-            }
-        } catch {
-            // Continue to start tunnel
+        if await isTunnelAlreadyRunning() {
+            await refreshDevices()
+            return
         }
 
-        // Start tunnel with admin privileges
         appState.statusMessage = "Starting tunnel (password may be required)..."
 
-        let command = findTunnelCommand()
-        print("[DeviceManager] Tunnel command: \(command)")
-
-        // Write stderr to a temp log so we can diagnose failures
+        let tunnelCommand = findTunnelCommand()
         let logPath = NSTemporaryDirectory() + "autolocation_tunnel.log"
-        let escaped = command.replacingOccurrences(of: "\\", with: "\\\\")
-                             .replacingOccurrences(of: "\"", with: "\\\"")
-        let logEscaped = logPath.replacingOccurrences(of: "\\", with: "\\\\")
-                                .replacingOccurrences(of: "\"", with: "\\\"")
-        let scriptSource = "do shell script \"\(escaped) > '\(logEscaped)' 2>&1 &\" with administrator privileges"
+        print("[DeviceManager] Tunnel command: \(tunnelCommand)")
 
+        let scriptSource = buildAppleScript(command: tunnelCommand, logPath: logPath)
         print("[DeviceManager] AppleScript: \(scriptSource)")
-        let success = await runOsascript(scriptSource)
 
-        guard success else {
+        guard await runOsascript(scriptSource) else {
             appState.statusMessage = "Tunnel start cancelled or failed"
             return
         }
 
-        // Poll for tunnel readiness (up to ~20 seconds)
+        if await pollForTunnel() {
+            return
+        }
+
+        reportTunnelFailure(logPath: logPath)
+    }
+
+    private func isTunnelAlreadyRunning() async -> Bool {
+        guard let response = try? await bridge.send(command: ["command": "check_tunnel"]),
+              response["tunnelRunning"] as? Bool == true else {
+            return false
+        }
+        appState.statusMessage = response["message"] as? String ?? "Tunnel running"
+        appState.tunnelCommand = nil
+        return true
+    }
+
+    private func buildAppleScript(command: String, logPath: String) -> String {
+        let escapedCommand = command.replacingOccurrences(of: "\\", with: "\\\\")
+                                    .replacingOccurrences(of: "\"", with: "\\\"")
+        let escapedLogPath = logPath.replacingOccurrences(of: "\\", with: "\\\\")
+                                    .replacingOccurrences(of: "\"", with: "\\\"")
+        return "do shell script \"\(escapedCommand) > '\(escapedLogPath)' 2>&1 &\" with administrator privileges"
+    }
+
+    /// Polls up to ~20 seconds for the tunnel to become ready. Returns true if tunnel started.
+    private func pollForTunnel() async -> Bool {
+        let maxAttempts = 10
+        let pollInterval: Duration = .seconds(2)
+
         appState.statusMessage = "Waiting for tunnel to initialize..."
-        for attempt in 1...10 {
-            try? await Task.sleep(for: .seconds(2))
-            do {
-                let response = try await bridge.send(command: ["command": "check_tunnel"])
-                if response["tunnelRunning"] as? Bool == true {
-                    appState.tunnelCommand = nil
-                    appState.statusMessage = "Tunnel started successfully"
-                    await refreshDevices()
-                    return
-                }
-            } catch {
-                // Keep polling
+
+        for attempt in 1...maxAttempts {
+            try? await Task.sleep(for: pollInterval)
+
+            if let response = try? await bridge.send(command: ["command": "check_tunnel"]),
+               response["tunnelRunning"] as? Bool == true {
+                appState.tunnelCommand = nil
+                appState.statusMessage = "Tunnel started successfully"
+                await refreshDevices()
+                return true
             }
-            if attempt < 10 {
+
+            if attempt < maxAttempts {
                 appState.statusMessage = "Waiting for tunnel to initialize... (\(attempt * 2)s)"
             }
         }
+        return false
+    }
 
-        // Read the log to show what went wrong
+    private func reportTunnelFailure(logPath: String) {
         let logContent = (try? String(contentsOfFile: logPath, encoding: .utf8)) ?? ""
-        if !logContent.isEmpty {
+        if logContent.isEmpty {
+            appState.statusMessage = "Tunnel process started — click Refresh to check status"
+        } else {
             let lastLines = logContent.components(separatedBy: "\n").suffix(3).joined(separator: " ")
             print("[DeviceManager] Tunnel log: \(logContent)")
             appState.statusMessage = "Tunnel may have failed: \(lastLines)"
-        } else {
-            appState.statusMessage = "Tunnel process started — click Refresh to check status"
         }
     }
 
@@ -228,68 +237,39 @@ class DeviceManager {
     // MARK: - Location Simulation
 
     func setLocation(latitude: Double, longitude: Double) async {
-        guard let udid = appState.selectedDeviceUDID else {
-            appState.statusMessage = "No device selected"
-            return
-        }
-
-        appState.isLoading = true
-        appState.statusMessage = "Setting location..."
-        defer { appState.isLoading = false }
-
-        do {
-            let command: [String: Any] = [
-                "command": "set_location",
-                "udid": udid,
-                "latitude": latitude,
-                "longitude": longitude
-            ]
-            _ = try await bridge.send(command: command)
-
+        await sendDeviceCommand(
+            fields: ["command": "set_location", "latitude": latitude, "longitude": longitude],
+            loadingMessage: "Setting location...",
+            failurePrefix: "Set location failed"
+        ) {
             appState.targetCoordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
             appState.isSimulating = true
             appState.statusMessage = String(format: "Location set to %.6f, %.6f", latitude, longitude)
-        } catch {
-            appState.statusMessage = "Set location failed: \(error.localizedDescription)"
         }
     }
 
     func clearLocation() async {
-        guard let udid = appState.selectedDeviceUDID else {
-            appState.statusMessage = "No device selected"
-            return
-        }
-
-        appState.isLoading = true
-        appState.statusMessage = "Clearing simulated location..."
-        defer { appState.isLoading = false }
-
-        do {
-            let command: [String: Any] = [
-                "command": "clear_location",
-                "udid": udid
-            ]
-            _ = try await bridge.send(command: command)
-
+        await sendDeviceCommand(
+            fields: ["command": "clear_location"],
+            loadingMessage: "Clearing simulated location...",
+            failurePrefix: "Clear location failed"
+        ) {
             appState.isSimulating = false
             appState.statusMessage = "Location cleared — GPS may take a moment to re-acquire real position"
-        } catch {
-            appState.statusMessage = "Clear location failed: \(error.localizedDescription)"
         }
     }
 
-    /// Lightweight location update for movement engine — no UI state changes.
+    /// Lightweight location update for movement engine -- no loading indicator or status changes.
     func setLocationSilent(latitude: Double, longitude: Double) async {
         guard let udid = appState.selectedDeviceUDID else { return }
 
         do {
-            let command: [String: Any] = [
+            _ = try await bridge.send(command: [
                 "command": "set_location",
                 "udid": udid,
                 "latitude": latitude,
                 "longitude": longitude
-            ]
-            _ = try await bridge.send(command: command)
+            ])
             appState.isSimulating = true
         } catch {
             appState.statusMessage = "Movement update failed: \(error.localizedDescription)"
@@ -299,52 +279,62 @@ class DeviceManager {
     // MARK: - GPX Playback
 
     func playGPX(path: String, speed: Double = 1.0) async {
-        guard let udid = appState.selectedDeviceUDID else {
-            appState.statusMessage = "No device selected"
-            return
-        }
-
-        appState.isLoading = true
-        appState.statusMessage = "Starting GPX playback..."
-        defer { appState.isLoading = false }
-
-        do {
-            let command: [String: Any] = [
-                "command": "play_gpx",
-                "udid": udid,
-                "path": path,
-                "speed": speed
-            ]
-            _ = try await bridge.send(command: command)
-
+        await sendDeviceCommand(
+            fields: ["command": "play_gpx", "path": path, "speed": speed],
+            loadingMessage: "Starting GPX playback...",
+            failurePrefix: "GPX playback failed"
+        ) {
             appState.isPlayingGPX = true
             appState.statusMessage = "Playing GPX route (speed: \(speed)x)"
-        } catch {
-            appState.statusMessage = "GPX playback failed: \(error.localizedDescription)"
         }
     }
 
     func stopPlayback() async {
+        await sendDeviceCommand(
+            fields: ["command": "stop_playback"],
+            loadingMessage: "Stopping playback...",
+            failurePrefix: "Stop playback failed"
+        ) {
+            appState.isPlayingGPX = false
+            appState.statusMessage = "Playback stopped"
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Auto-selects the first device if none is selected or the current selection is no longer available.
+    private func autoSelectDeviceIfNeeded(from devices: [Device]) {
+        let currentSelectionValid = devices.contains { $0.udid == appState.selectedDeviceUDID }
+        if !currentSelectionValid {
+            appState.selectedDeviceUDID = devices.first?.udid
+        }
+    }
+
+    /// Sends a bridge command for the selected device with standard loading/error handling.
+    /// The `fields` dictionary is merged with the selected device's UDID before sending.
+    /// On success, the `onSuccess` closure is called to update app state.
+    private func sendDeviceCommand(
+        fields: [String: Any],
+        loadingMessage: String,
+        failurePrefix: String,
+        onSuccess: () -> Void
+    ) async {
         guard let udid = appState.selectedDeviceUDID else {
             appState.statusMessage = "No device selected"
             return
         }
 
         appState.isLoading = true
-        appState.statusMessage = "Stopping playback..."
+        appState.statusMessage = loadingMessage
         defer { appState.isLoading = false }
 
         do {
-            let command: [String: Any] = [
-                "command": "stop_playback",
-                "udid": udid
-            ]
+            var command = fields
+            command["udid"] = udid
             _ = try await bridge.send(command: command)
-
-            appState.isPlayingGPX = false
-            appState.statusMessage = "Playback stopped"
+            onSuccess()
         } catch {
-            appState.statusMessage = "Stop playback failed: \(error.localizedDescription)"
+            appState.statusMessage = "\(failurePrefix): \(error.localizedDescription)"
         }
     }
 }

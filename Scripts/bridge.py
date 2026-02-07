@@ -21,7 +21,6 @@ iOS 17+ Tunnel:
 """
 
 import json
-import os
 import signal
 import sys
 import threading
@@ -148,24 +147,19 @@ def get_lockdown(udid: str = None):
     if udid and udid in _lockdown_cache:
         return _lockdown_cache[udid]
 
-    if udid:
-        lockdown = create_using_usbmux(serial=udid)
-    else:
-        lockdown = create_using_usbmux()
-
-    resolved_udid = lockdown.udid if hasattr(lockdown, "udid") else udid or "unknown"
+    lockdown = create_using_usbmux(serial=udid) if udid else create_using_usbmux()
+    resolved_udid = getattr(lockdown, "udid", None) or udid or "unknown"
     _lockdown_cache[resolved_udid] = lockdown
     return lockdown
 
 
 def invalidate_lockdown(udid: str = None):
     """Remove a cached lockdown client (e.g. after an error)."""
-    if udid and udid in _lockdown_cache:
-        del _lockdown_cache[udid]
-    if udid and udid in _rsd_cache:
-        del _rsd_cache[udid]
-    if udid:
-        _close_dvt_session(udid)
+    if not udid:
+        return
+    _lockdown_cache.pop(udid, None)
+    _rsd_cache.pop(udid, None)
+    _close_dvt_session(udid)
 
 
 def _ios_major_version(lockdown) -> int:
@@ -284,6 +278,19 @@ def cmd_ping() -> dict:
     return ok_response(message="pong")
 
 
+def _get_tunnel_status(serial: str, ios_major: int) -> str:
+    """Return the tunnel status string for a device."""
+    if ios_major < 17:
+        return "not_needed"
+    if not _tunneld_available:
+        return "not_connected"
+    try:
+        rsd = get_tunneld_device_by_udid(serial)
+        return "connected" if rsd is not None else "not_connected"
+    except Exception:
+        return "not_connected"
+
+
 def cmd_list_devices() -> dict:
     require_pmd3()
     connected = usbmux_list_devices()
@@ -293,17 +300,7 @@ def cmd_list_devices() -> dict:
             lockdown = create_using_usbmux(serial=mux_device.serial)
             major = _ios_major_version(lockdown)
 
-            # Check tunnel status for iOS 17+
-            tunnel_status = "not_needed"
-            if major >= 17:
-                tunnel_status = "not_connected"
-                try:
-                    if _tunneld_available:
-                        rsd = get_tunneld_device_by_udid(mux_device.serial)
-                        if rsd is not None:
-                            tunnel_status = "connected"
-                except Exception:
-                    pass
+            tunnel_status = _get_tunnel_status(mux_device.serial, major)
 
             devices.append(
                 {
@@ -403,45 +400,44 @@ def _clear_location_dvt(rsd, udid: str):
         log(f"No active DVT session for {udid}, nothing to clear")
 
 
-def cmd_set_location(latitude: float, longitude: float, udid: str = None) -> dict:
+def _run_location_command(udid: str, *, legacy_fn, dvt_fn):
+    """
+    Resolve the device, pick the right iOS path (legacy vs DVT),
+    and execute the given callback.  Cleans up caches on failure.
+    """
     require_pmd3()
     lockdown = get_lockdown(udid)
     major = _ios_major_version(lockdown)
+    resolved_udid = udid or lockdown.udid
 
     try:
         if major >= 17:
             rsd = _get_rsd_for_device(udid)
-            _set_location_dvt(rsd, udid or lockdown.udid, latitude, longitude)
+            dvt_fn(rsd, resolved_udid)
         else:
-            _set_location_legacy(lockdown, latitude, longitude)
+            legacy_fn(lockdown)
     except Exception:
-        # On error, clean up the DVT session too
         if udid:
             _close_dvt_session(udid)
         invalidate_lockdown(udid)
         raise
 
+
+def cmd_set_location(latitude: float, longitude: float, udid: str = None) -> dict:
+    _run_location_command(
+        udid,
+        legacy_fn=lambda ld: _set_location_legacy(ld, latitude, longitude),
+        dvt_fn=lambda rsd, uid: _set_location_dvt(rsd, uid, latitude, longitude),
+    )
     return ok_response()
 
 
 def cmd_clear_location(udid: str = None) -> dict:
-    require_pmd3()
-    lockdown = get_lockdown(udid)
-    major = _ios_major_version(lockdown)
-
-    try:
-        if major >= 17:
-            rsd = _get_rsd_for_device(udid)
-            _clear_location_dvt(rsd, udid or lockdown.udid)
-        else:
-            _clear_location_legacy(lockdown)
-    except Exception:
-        # On error, clean up the DVT session too
-        if udid:
-            _close_dvt_session(udid)
-        invalidate_lockdown(udid)
-        raise
-
+    _run_location_command(
+        udid,
+        legacy_fn=lambda ld: _clear_location_legacy(ld),
+        dvt_fn=lambda rsd, uid: _clear_location_dvt(rsd, uid),
+    )
     return ok_response()
 
 
@@ -468,26 +464,17 @@ def _parse_gpx(path: str) -> list:
     if root.tag.startswith("{"):
         ns = root.tag.split("}")[0] + "}"
 
+    # XPath expressions for all supported GPX point types
+    point_xpaths = [
+        f"{ns}wpt",
+        f"{ns}trk/{ns}trkseg/{ns}trkpt",
+        f"{ns}rte/{ns}rtept",
+    ]
+
     points = []
-
-    # Collect <wpt> elements
-    for wpt in root.findall(f"{ns}wpt"):
-        point = _parse_point(wpt, ns)
-        if point:
-            points.append(point)
-
-    # Collect <trkpt> elements from all tracks/segments
-    for trk in root.findall(f"{ns}trk"):
-        for seg in trk.findall(f"{ns}trkseg"):
-            for trkpt in seg.findall(f"{ns}trkpt"):
-                point = _parse_point(trkpt, ns)
-                if point:
-                    points.append(point)
-
-    # Collect <rtept> elements from routes
-    for rte in root.findall(f"{ns}rte"):
-        for rtept in rte.findall(f"{ns}rtept"):
-            point = _parse_point(rtept, ns)
+    for xpath in point_xpaths:
+        for element in root.findall(xpath):
+            point = _parse_point(element, ns)
             if point:
                 points.append(point)
 
@@ -501,19 +488,21 @@ def _parse_point(element, ns: str) -> dict:
     if lat is None or lon is None:
         return None
 
-    time_el = element.find(f"{ns}time")
-    parsed_time = None
-    if time_el is not None and time_el.text:
-        try:
-            text = time_el.text.strip()
-            # Handle common GPX time formats
-            if text.endswith("Z"):
-                text = text[:-1] + "+00:00"
-            parsed_time = datetime.fromisoformat(text)
-        except ValueError:
-            pass
+    return {"lat": float(lat), "lon": float(lon), "time": _parse_time(element, ns)}
 
-    return {"lat": float(lat), "lon": float(lon), "time": parsed_time}
+
+def _parse_time(element, ns: str):
+    """Extract and parse a GPX time element, returning datetime or None."""
+    time_el = element.find(f"{ns}time")
+    if time_el is None or not time_el.text:
+        return None
+    try:
+        text = time_el.text.strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def _playback_worker(path: str, udid: str, speed: float):
@@ -537,18 +526,12 @@ def _playback_worker(path: str, udid: str, speed: float):
                 log(f"Error setting location at point {i}: {e}")
                 return
 
-            # Calculate delay until next point
+            # Wait until it's time for the next point (interruptible)
             if i < len(points) - 1:
                 delay = _compute_delay(point, points[i + 1], speed)
-                # Wait in small increments so we can respond to stop quickly
-                waited = 0.0
-                while waited < delay:
-                    if _playback_stop.is_set():
-                        log("Playback stopped by user")
-                        return
-                    step = min(0.1, delay - waited)
-                    _playback_stop.wait(step)
-                    waited += step
+                if _playback_stop.wait(timeout=delay):
+                    log("Playback stopped by user")
+                    return
 
         log("GPX playback finished")
     except Exception as e:
@@ -680,8 +663,7 @@ def main():
         log("Interrupted, exiting")
     finally:
         _stop_playback_internal()
-        # Close any persistent DVT sessions
-        for udid in list(_dvt_sessions.keys()):
+        for udid in list(_dvt_sessions):
             _close_dvt_session(udid)
         log("Bridge shut down")
 

@@ -14,24 +14,8 @@ struct CoordinateInputView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Lat:")
-                    .frame(width: 35, alignment: .trailing)
-                    .font(.caption)
-                TextField("Latitude", text: $latitudeText)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($latFocused)
-                    .onSubmit { updateCoordinate() }
-            }
-            HStack {
-                Text("Lon:")
-                    .frame(width: 35, alignment: .trailing)
-                    .font(.caption)
-                TextField("Longitude", text: $longitudeText)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($lonFocused)
-                    .onSubmit { updateCoordinate() }
-            }
+            coordinateRow(label: "Lat:", text: $latitudeText, focus: $latFocused)
+            coordinateRow(label: "Lon:", text: $longitudeText, focus: $lonFocused)
         }
         .onChange(of: latFocused) { _, focused in
             if !focused { updateCoordinate() }
@@ -41,10 +25,20 @@ struct CoordinateInputView: View {
         }
         .onChange(of: appState.targetCoordinate) { _, newValue in
             guard !isEditing, let coord = newValue else { return }
-            let newLat = String(format: "%.6f", coord.latitude)
-            let newLon = String(format: "%.6f", coord.longitude)
-            if newLat != latitudeText { latitudeText = newLat }
-            if newLon != longitudeText { longitudeText = newLon }
+            latitudeText = String(format: "%.6f", coord.latitude)
+            longitudeText = String(format: "%.6f", coord.longitude)
+        }
+    }
+
+    private func coordinateRow(label: String, text: Binding<String>, focus: FocusState<Bool>.Binding) -> some View {
+        HStack {
+            Text(label)
+                .frame(width: 35, alignment: .trailing)
+                .font(.caption)
+            TextField(label, text: text)
+                .textFieldStyle(.roundedBorder)
+                .focused(focus)
+                .onSubmit { updateCoordinate() }
         }
     }
 

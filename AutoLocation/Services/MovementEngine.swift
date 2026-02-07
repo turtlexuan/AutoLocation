@@ -80,31 +80,17 @@ class MovementEngine {
         inputBearing = bearing
         inputMagnitude = min(max(magnitude, 0), 1)
 
-        if magnitude > 0 {
-            currentBearing = bearing
-            currentSpeed = effectiveMaxSpeed * inputMagnitude
-
-            // Cancel walk-to-point and route if user takes manual control
-            if isWalkingToPoint {
-                isWalkingToPoint = false
-                walkToDestination = nil
-            }
-            if appState.isFollowingRoute {
-                routeWaypoints = []
-                appState.isFollowingRoute = false
-                appState.currentRouteWaypointIndex = 0
-                appState.statusMessage = "Route cancelled (manual control)"
-            }
-
-            if !isMoving {
-                startMoving()
-            }
-        } else {
+        guard magnitude > 0 else {
             currentSpeed = 0
-            if !isWalkingToPoint {
-                stopMoving()
-            }
+            if !isWalkingToPoint { stopMoving() }
+            return
         }
+
+        currentBearing = bearing
+        currentSpeed = effectiveMaxSpeed * inputMagnitude
+        cancelAutomatedMovement(statusMessage: "Route cancelled (manual control)")
+
+        if !isMoving { startMoving() }
     }
 
     // MARK: - Walk to Point
@@ -127,9 +113,6 @@ class MovementEngine {
     }
 
     func cancelWalkToPoint() {
-        isWalkingToPoint = false
-        walkToDestination = nil
-        currentSpeed = 0
         stopMoving()
     }
 
@@ -141,15 +124,11 @@ class MovementEngine {
         routeWaypoints = waypoints
         appState.isFollowingRoute = true
         appState.currentRouteWaypointIndex = 0
-
-        // Navigate to the first waypoint using the existing walk-to logic
         walkToPoint(waypoints[0].coordinate)
     }
 
     func stopRoute() {
-        routeWaypoints = []
-        appState.isFollowingRoute = false
-        appState.currentRouteWaypointIndex = 0
+        clearRouteState()
         stopMoving()
     }
 
@@ -157,18 +136,13 @@ class MovementEngine {
         let nextIndex = appState.currentRouteWaypointIndex + 1
 
         if nextIndex < routeWaypoints.count {
-            // More waypoints remain
             appState.currentRouteWaypointIndex = nextIndex
             walkToPoint(routeWaypoints[nextIndex].coordinate)
         } else if appState.shouldLoopRoute {
-            // Route complete, loop back to start
             appState.currentRouteWaypointIndex = 0
             walkToPoint(routeWaypoints[0].coordinate)
         } else {
-            // Route complete, no loop
-            appState.isFollowingRoute = false
-            routeWaypoints = []
-            appState.currentRouteWaypointIndex = 0
+            clearRouteState()
             appState.statusMessage = "Route complete"
         }
     }
@@ -178,8 +152,7 @@ class MovementEngine {
     func startMoving() {
         guard updateTimer == nil else { return }
 
-        // Always sync with the latest target position so movement starts
-        // from where the user last set the pin, not from a stale position.
+        // Sync with the latest target so movement starts from the current pin position
         currentLocation = appState.targetCoordinate
         guard currentLocation != nil else { return }
 
@@ -198,12 +171,35 @@ class MovementEngine {
         updateTimer = nil
         isMoving = false
         currentSpeed = 0
-        isWalkingToPoint = false
-        walkToDestination = nil
+        clearWalkToPointState()
     }
 
     func resetDistance() {
         distanceTraveled = 0
+    }
+
+    // MARK: - State Reset Helpers
+
+    private func clearWalkToPointState() {
+        isWalkingToPoint = false
+        walkToDestination = nil
+    }
+
+    private func clearRouteState() {
+        routeWaypoints = []
+        appState.isFollowingRoute = false
+        appState.currentRouteWaypointIndex = 0
+    }
+
+    /// Cancels walk-to-point and route following if active. Used when the user takes manual control.
+    private func cancelAutomatedMovement(statusMessage: String) {
+        if isWalkingToPoint {
+            clearWalkToPointState()
+        }
+        if appState.isFollowingRoute {
+            clearRouteState()
+            appState.statusMessage = statusMessage
+        }
     }
 
     // MARK: - Timer Tick
@@ -211,36 +207,8 @@ class MovementEngine {
     private func tick() {
         guard let location = currentLocation, currentSpeed > 0 else { return }
 
-        // Walk-to-point: update bearing toward destination and check arrival
         if isWalkingToPoint, let dest = walkToDestination {
-            let remainingDistance = Self.distance(from: location, to: dest)
-            let stepDistance = currentSpeed * updateInterval
-
-            if remainingDistance <= stepDistance {
-                // Arrived at destination
-                currentLocation = dest
-                appState.targetCoordinate = dest
-                distanceTraveled += remainingDistance
-                sendLocationUpdate(dest)
-
-                if appState.isFollowingRoute {
-                    // Clear current walk-to state before advancing
-                    isWalkingToPoint = false
-                    walkToDestination = nil
-
-                    let waypointName = routeWaypoints[safe: appState.currentRouteWaypointIndex]?.name
-                        ?? "Waypoint \(appState.currentRouteWaypointIndex + 1)"
-                    appState.statusMessage = "Reached \(waypointName)"
-
-                    advanceToNextWaypoint()
-                } else {
-                    cancelWalkToPoint()
-                    appState.statusMessage = "Arrived at destination"
-                }
-                return
-            }
-
-            // Update bearing toward destination
+            if handleArrivalIfNeeded(from: location, to: dest) { return }
             currentBearing = Self.bearing(from: location, to: dest)
             currentSpeed = effectiveMaxSpeed
         }
@@ -248,11 +216,37 @@ class MovementEngine {
         let distance = currentSpeed * updateInterval
         let newLocation = Self.destinationPoint(from: location, distance: distance, bearing: currentBearing)
 
-        currentLocation = newLocation
-        appState.targetCoordinate = newLocation
-        distanceTraveled += distance
+        applyPosition(newLocation, distanceDelta: distance)
+    }
 
-        sendLocationUpdate(newLocation)
+    /// Returns `true` if the destination was reached and arrival was handled.
+    private func handleArrivalIfNeeded(from location: CLLocationCoordinate2D, to dest: CLLocationCoordinate2D) -> Bool {
+        let remainingDistance = Self.distance(from: location, to: dest)
+        let stepDistance = currentSpeed * updateInterval
+
+        guard remainingDistance <= stepDistance else { return false }
+
+        applyPosition(dest, distanceDelta: remainingDistance)
+
+        if appState.isFollowingRoute {
+            clearWalkToPointState()
+            let waypointName = routeWaypoints[safe: appState.currentRouteWaypointIndex]?.name
+                ?? "Waypoint \(appState.currentRouteWaypointIndex + 1)"
+            appState.statusMessage = "Reached \(waypointName)"
+            advanceToNextWaypoint()
+        } else {
+            cancelWalkToPoint()
+            appState.statusMessage = "Arrived at destination"
+        }
+
+        return true
+    }
+
+    private func applyPosition(_ coord: CLLocationCoordinate2D, distanceDelta: Double) {
+        currentLocation = coord
+        appState.targetCoordinate = coord
+        distanceTraveled += distanceDelta
+        sendLocationUpdate(coord)
     }
 
     private func sendLocationUpdate(_ coord: CLLocationCoordinate2D) {
