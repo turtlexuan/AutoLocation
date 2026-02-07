@@ -12,15 +12,20 @@
 		1AFF8CCF486777D8AF889304 /* CoordinateInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F274AE3F19D6A602E1C8C9 /* CoordinateInputView.swift */; };
 		1B2E2C217D3EC73E73EC7A8E /* MovementControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBA52417D16967142583A17F /* MovementControlPanel.swift */; };
 		358006B723E276F9ECE6653F /* MapContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA664C7D807F300BD6096DE3 /* MapContainerView.swift */; };
+		4C979A51E65673464FA600F0 /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C5E0D836EE22D74C67BCD0 /* StatusBadge.swift */; };
 		7D5920E4D98118C947011FD5 /* PythonBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F38FC55291A7B8F83F4F4D /* PythonBridge.swift */; };
 		940D25666F6BE5C4A5E8BC20 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43EC5BDD700AF638C71486CA /* ContentView.swift */; };
 		967CBC368654C685830B0ED9 /* JoystickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0A41690A79690B0CB8B309 /* JoystickView.swift */; };
 		A924220953E7D16CF9996059 /* Device.swift in Sources */ = {isa = PBXBuildFile; fileRef = 775CD0B6690E4A0E11CD81B5 /* Device.swift */; };
 		AB5B1D7AA19FD50E8CFC8590 /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73A2209A1ACE7D74A01F203E /* Route.swift */; };
+		AFE25B7717AC9F80BA33CAE0 /* StatCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 847EC48981A6D552AC6B14DA /* StatCard.swift */; };
+		BA18A73FA57606F8B1C58110 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC15423BE9F505CBDE435BB0 /* DesignSystem.swift */; };
 		BC7C4653111B496B336372B9 /* LocationSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA1435BEFE95F41DD982387 /* LocationSearchService.swift */; };
 		BFCD26A028A8CF7B014459C5 /* MovementEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEFF998810102414EEA0477 /* MovementEngine.swift */; };
 		C2BDC00BB1C4AEE87C8EFFED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52918D9BB9ADD7D410D15407 /* AppState.swift */; };
 		CF68A811C0DA3F078F672314 /* AutoLocationApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5E4458620BF5342A262418 /* AutoLocationApp.swift */; };
+		D8B698924A3EDDEC32478D2E /* ActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44A9CC6872B0EE511F3CD45 /* ActionButton.swift */; };
+		DD69843E64B7245E29FA6587 /* CollapsibleSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9377B708CAFE15867DE18CA /* CollapsibleSection.swift */; };
 		E09C0D6401A796616EE0974E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2392A8F7296B3C6BD950A613 /* Assets.xcassets */; };
 		F63F1EA63FED2003B4A1EBD9 /* bridge in Resources */ = {isa = PBXBuildFile; fileRef = 3B17AC2B211219967828D77E /* bridge */; };
 		FCEFDD29D3CCE87330BA60D8 /* LocationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B1D681B03C20402790A074D /* LocationSearchView.swift */; };
@@ -40,8 +45,13 @@
 		52918D9BB9ADD7D410D15407 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		73A2209A1ACE7D74A01F203E /* Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Route.swift; sourceTree = "<group>"; };
 		775CD0B6690E4A0E11CD81B5 /* Device.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Device.swift; sourceTree = "<group>"; };
+		847EC48981A6D552AC6B14DA /* StatCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCard.swift; sourceTree = "<group>"; };
+		96C5E0D836EE22D74C67BCD0 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
+		AC15423BE9F505CBDE435BB0 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		B9377B708CAFE15867DE18CA /* CollapsibleSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollapsibleSection.swift; sourceTree = "<group>"; };
 		BC5E4458620BF5342A262418 /* AutoLocationApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoLocationApp.swift; sourceTree = "<group>"; };
 		C3ED039AEB66DA5E1D117964 /* AutoLocation.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoLocation.entitlements; sourceTree = "<group>"; };
+		C44A9CC6872B0EE511F3CD45 /* ActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionButton.swift; sourceTree = "<group>"; };
 		D6F38FC55291A7B8F83F4F4D /* PythonBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PythonBridge.swift; sourceTree = "<group>"; };
 		EBA52417D16967142583A17F /* MovementControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovementControlPanel.swift; sourceTree = "<group>"; };
 		EDA1435BEFE95F41DD982387 /* LocationSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSearchService.swift; sourceTree = "<group>"; };
@@ -93,6 +103,15 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		9BA84BB73CB4AB83D50035CC /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				AC15423BE9F505CBDE435BB0 /* DesignSystem.swift */,
+				D4A58DEBFFED679BE79ECA01 /* Components */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
 		C1F60D8F884769AC2A515D44 = {
 			isa = PBXGroup;
 			children = (
@@ -109,11 +128,23 @@
 				C3ED039AEB66DA5E1D117964 /* AutoLocation.entitlements */,
 				BC5E4458620BF5342A262418 /* AutoLocationApp.swift */,
 				335D95E03A94026341FB4DDB /* Info.plist */,
+				9BA84BB73CB4AB83D50035CC /* DesignSystem */,
 				98439DAFB932D4E613908400 /* Models */,
 				2B076E9AF576CC2521759E00 /* Services */,
 				455AF4190B5F707167430462 /* Views */,
 			);
 			path = AutoLocation;
+			sourceTree = "<group>";
+		};
+		D4A58DEBFFED679BE79ECA01 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				C44A9CC6872B0EE511F3CD45 /* ActionButton.swift */,
+				B9377B708CAFE15867DE18CA /* CollapsibleSection.swift */,
+				847EC48981A6D552AC6B14DA /* StatCard.swift */,
+				96C5E0D836EE22D74C67BCD0 /* StatusBadge.swift */,
+			);
+			path = Components;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -210,10 +241,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D8B698924A3EDDEC32478D2E /* ActionButton.swift in Sources */,
 				C2BDC00BB1C4AEE87C8EFFED /* AppState.swift in Sources */,
 				CF68A811C0DA3F078F672314 /* AutoLocationApp.swift in Sources */,
+				DD69843E64B7245E29FA6587 /* CollapsibleSection.swift in Sources */,
 				940D25666F6BE5C4A5E8BC20 /* ContentView.swift in Sources */,
 				1AFF8CCF486777D8AF889304 /* CoordinateInputView.swift in Sources */,
+				BA18A73FA57606F8B1C58110 /* DesignSystem.swift in Sources */,
 				A924220953E7D16CF9996059 /* Device.swift in Sources */,
 				0A6F2EEECDDF5BCDCFB7A785 /* DeviceManager.swift in Sources */,
 				967CBC368654C685830B0ED9 /* JoystickView.swift in Sources */,
@@ -225,6 +259,8 @@
 				7D5920E4D98118C947011FD5 /* PythonBridge.swift in Sources */,
 				AB5B1D7AA19FD50E8CFC8590 /* Route.swift in Sources */,
 				08A74761EE9C2F2EFD7C90F3 /* SidebarView.swift in Sources */,
+				AFE25B7717AC9F80BA33CAE0 /* StatCard.swift in Sources */,
+				4C979A51E65673464FA600F0 /* StatusBadge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

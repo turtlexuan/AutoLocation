@@ -6,7 +6,7 @@ struct MapContainerView: View {
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
 
-    private static let defaultSpan = MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    private static let defaultSpan = MKCoordinateSpan(latitudeDelta: 0.0005, longitudeDelta: 0.0005)
     private static let defaultCenter = CLLocationCoordinate2D(latitude: 25.0330, longitude: 121.5654)
 
     @State private var cameraPosition: MapCameraPosition = .region(
@@ -14,6 +14,7 @@ struct MapContainerView: View {
     )
     @State private var currentSpan: MKCoordinateSpan?
     @State private var userLocationHelper = UserLocationHelper()
+    @State private var computerLocation: CLLocationCoordinate2D?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -32,10 +33,16 @@ struct MapContainerView: View {
                 }
             }
 
-            recenterButton
+            // Button stack — bottom trailing
+            VStack(spacing: DS.Spacing.xs) {
+                myLocationButton
+                recenterButton
+            }
+            .padding(DS.Spacing.sm)
         }
         .onAppear {
             userLocationHelper.requestLocation { coordinate in
+                computerLocation = coordinate
                 updateCamera(to: coordinate, animated: true)
             }
         }
@@ -56,11 +63,19 @@ struct MapContainerView: View {
         if let coord = appState.targetCoordinate {
             if let engine = movementEngine, engine.isMoving {
                 Annotation("", coordinate: coord) {
-                    Image(systemName: "location.north.fill")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
-                        .rotationEffect(.degrees(engine.currentBearing))
-                        .shadow(color: .blue.opacity(0.5), radius: 3)
+                    ZStack {
+                        // White outline for contrast against any map background
+                        Image(systemName: "location.north.fill")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        Image(systemName: "location.north.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Color(red: 0.0, green: 0.48, blue: 1.0))
+                    }
+                    .rotationEffect(.degrees(engine.currentBearing))
+                    .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+                    .shadow(color: Color(red: 0.0, green: 0.48, blue: 1.0).opacity(0.5), radius: 8)
                 }
             } else {
                 Marker("Target", coordinate: coord)
@@ -73,7 +88,7 @@ struct MapContainerView: View {
     private var destinationMarker: some MapContent {
         if let dest = movementEngine?.walkToDestination {
             Marker("Destination", coordinate: dest)
-                .tint(.green)
+                .tint(DS.Colors.success)
         }
     }
 
@@ -93,7 +108,7 @@ struct MapContainerView: View {
     private var routePolyline: some MapContent {
         if appState.routeWaypoints.count >= 2 {
             MapPolyline(coordinates: appState.routeWaypoints.map(\.coordinate))
-                .stroke(.indigo, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                .stroke(DS.Colors.route, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
         }
     }
 
@@ -106,7 +121,7 @@ struct MapContainerView: View {
                 currentLocation,
                 appState.routeWaypoints[appState.currentRouteWaypointIndex].coordinate
             ])
-            .stroke(.orange, style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [8, 6]))
+            .stroke(DS.Colors.warning, style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [8, 6]))
         }
     }
 
@@ -129,6 +144,25 @@ struct MapContainerView: View {
     }
 
     @ViewBuilder
+    private var myLocationButton: some View {
+        Button {
+            userLocationHelper.requestLocation { coordinate in
+                computerLocation = coordinate
+                updateCamera(to: coordinate, animated: true)
+            }
+        } label: {
+            Image(systemName: "desktopcomputer")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(DS.Colors.textSecondary)
+                .padding(DS.Spacing.sm)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DS.Radius.md))
+                .shadowMedium()
+        }
+        .buttonStyle(.plain)
+        .help("Center on computer's location")
+    }
+
+    @ViewBuilder
     private var recenterButton: some View {
         if appState.targetCoordinate != nil {
             Button {
@@ -136,14 +170,14 @@ struct MapContainerView: View {
                 updateCamera(to: coord, animated: true)
             } label: {
                 Image(systemName: "location.fill")
-                    .font(.title3)
-                    .padding(10)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
-                    .shadow(radius: 2)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(DS.Colors.active)
+                    .padding(DS.Spacing.sm)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DS.Radius.md))
+                    .shadowMedium()
             }
             .buttonStyle(.plain)
-            .padding(12)
+            .help("Center on target pin")
         }
     }
 
@@ -161,7 +195,7 @@ struct MapContainerView: View {
         let span = currentSpan ?? Self.defaultSpan
         let region = MKCoordinateRegion(center: center, span: span)
         if animated {
-            withAnimation(.easeInOut(duration: 0.5)) {
+            withAnimation(DS.Animation.slow) {
                 cameraPosition = .region(region)
             }
         } else {
@@ -169,17 +203,15 @@ struct MapContainerView: View {
         }
     }
 
-    /// Returns the color for a waypoint based on route progress:
-    /// green = visited, orange = current target, blue = upcoming.
     private func waypointColor(for index: Int) -> Color {
-        guard appState.isFollowingRoute else { return .blue }
+        guard appState.isFollowingRoute else { return DS.Colors.route }
 
         if index < appState.currentRouteWaypointIndex {
-            return .green
+            return DS.Colors.success
         } else if index == appState.currentRouteWaypointIndex {
-            return .orange
+            return DS.Colors.warning
         } else {
-            return .blue
+            return DS.Colors.route
         }
     }
 }

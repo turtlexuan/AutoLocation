@@ -15,7 +15,7 @@ struct JoystickView: View {
 
             // Outer ring
             Circle()
-                .stroke(Color.secondary.opacity(0.3), lineWidth: 2)
+                .stroke(DS.Colors.textPrimary.opacity(0.1), lineWidth: 2)
                 .frame(width: radius * 2, height: radius * 2)
 
             // Cross-hair guides
@@ -25,7 +25,7 @@ struct JoystickView: View {
                 path.move(to: CGPoint(x: 4, y: radius))
                 path.addLine(to: CGPoint(x: radius * 2 - 4, y: radius))
             }
-            .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+            .stroke(DS.Colors.textPrimary.opacity(0.06), lineWidth: 1)
             .frame(width: radius * 2, height: radius * 2)
 
             // Direction line from center to thumb
@@ -34,14 +34,14 @@ struct JoystickView: View {
                     path.move(to: CGPoint(x: 0, y: 0))
                     path.addLine(to: CGPoint(x: dragOffset.width, y: dragOffset.height))
                 }
-                .stroke(Color.accentColor.opacity(0.3), lineWidth: 2)
+                .stroke(DS.Colors.active.opacity(0.25), lineWidth: 2)
             }
 
             // Thumb
             Circle()
-                .fill(Color.accentColor)
+                .fill(DS.Colors.active)
                 .frame(width: thumbRadius * 2, height: thumbRadius * 2)
-                .shadow(color: .accentColor.opacity(0.3), radius: 4)
+                .shadow(color: DS.Colors.active.opacity(0.3), radius: 4)
                 .offset(dragOffset)
         }
         .frame(width: radius * 2 + 30, height: radius * 2 + 30)
@@ -62,7 +62,6 @@ struct JoystickView: View {
                         )
                     }
 
-                    // Angle: 0 = north (up), clockwise
                     let angle = atan2(translation.width, -translation.height) * 180.0 / .pi
                     let normalizedAngle = angle < 0 ? angle + 360 : angle
                     let magnitude = clamped / radius
@@ -90,7 +89,8 @@ struct JoystickView: View {
             Text("W")
                 .offset(x: -labelOffset)
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
+        .font(DS.Typography.labelSmall)
+        .fontWeight(.medium)
+        .foregroundStyle(DS.Colors.textTertiary)
     }
 }

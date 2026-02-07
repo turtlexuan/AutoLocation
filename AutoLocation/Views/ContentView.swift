@@ -116,34 +116,54 @@ struct StatusBarView: View {
 
     private var indicatorColor: Color {
         if appState.isSimulating || appState.isPlayingGPX {
-            return .green
+            return DS.Colors.success
         } else if appState.isLoading {
-            return .yellow
+            return DS.Colors.warning
         } else {
-            return .gray
+            return DS.Colors.textTertiary
+        }
+    }
+
+    private var statusIcon: String {
+        if appState.isSimulating || appState.isPlayingGPX {
+            return "location.fill"
+        } else if appState.isLoading {
+            return "arrow.triangle.2.circlepath"
+        } else {
+            return "circle"
         }
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(indicatorColor)
-                .frame(width: 8, height: 8)
+        HStack(spacing: DS.Spacing.xs) {
+            HStack(spacing: DS.Spacing.xxs + 1) {
+                Image(systemName: statusIcon)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(indicatorColor)
+
+                Circle()
+                    .fill(indicatorColor)
+                    .frame(width: 6, height: 6)
+            }
 
             Text(appState.statusMessage)
-                .font(.caption)
+                .font(DS.Typography.labelSmall)
+                .foregroundStyle(DS.Colors.textSecondary)
                 .lineLimit(1)
 
             Spacer()
 
             if appState.targetCoordinate != nil {
                 Text(appState.coordinateText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(DS.Typography.mono)
+                    .foregroundStyle(DS.Colors.textTertiary)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, DS.Spacing.sm)
+        .padding(.vertical, DS.Spacing.xxs + 2)
         .background(.bar)
+        .overlay(alignment: .top) {
+            Divider()
+        }
     }
 }

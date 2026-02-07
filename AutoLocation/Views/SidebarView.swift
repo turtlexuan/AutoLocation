@@ -11,61 +11,73 @@ struct SidebarView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(spacing: DS.Spacing.sm) {
                 devicesSection
                 tunnelSection
                 locationSection
                 routePlannerSection
                 gpxSection
             }
-            .padding()
+            .padding(DS.Spacing.sm)
         }
+        .scrollContentBackground(.hidden)
+        .background(DS.Colors.backgroundPrimary.opacity(0.5))
     }
 
     // MARK: - Devices Section
 
     private var devicesSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label("Devices", systemImage: "iphone")
-                        .font(.headline)
-
-                    Spacer()
-
-                    Button {
-                        Task {
-                            await deviceManager?.refreshDevices()
-                        }
-                    } label: {
+        CollapsibleSection(
+            title: "Devices",
+            icon: "iphone",
+            storageKey: "sidebar.devices.expanded",
+            badge: appState.devices.isEmpty ? nil : "\(appState.devices.count)"
+        ) {
+            HStack {
+                Spacer()
+                Button {
+                    Task {
+                        await deviceManager?.refreshDevices()
+                    }
+                } label: {
+                    HStack(spacing: DS.Spacing.xxs) {
                         Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .medium))
+                        Text("Refresh")
+                            .font(DS.Typography.labelSmall)
                     }
-                    .buttonStyle(.borderless)
-                    .disabled(appState.isLoading)
+                    .foregroundStyle(DS.Colors.active)
+                    .padding(.horizontal, DS.Spacing.xs)
+                    .padding(.vertical, DS.Spacing.xxs)
+                    .background(DS.Colors.active.opacity(0.1), in: Capsule())
                 }
+                .buttonStyle(.plain)
+                .disabled(appState.isLoading)
+            }
 
-                Divider()
-
-                if appState.devices.isEmpty {
-                    VStack(spacing: 4) {
-                        Text("No devices found")
-                            .foregroundStyle(.secondary)
-                        Text("Connect an iPhone via USB or Wi-Fi")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 8)
-                } else {
-                    ForEach(appState.devices) { device in
-                        DeviceRow(
-                            device: device,
-                            isSelected: appState.selectedDeviceUDID == device.udid
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            appState.selectedDeviceUDID = device.udid
-                        }
+            if appState.devices.isEmpty {
+                VStack(spacing: DS.Spacing.xxs) {
+                    Image(systemName: "iphone.slash")
+                        .font(.system(size: 24))
+                        .foregroundStyle(DS.Colors.textTertiary)
+                    Text("No devices found")
+                        .font(DS.Typography.label)
+                        .foregroundStyle(DS.Colors.textSecondary)
+                    Text("Connect an iPhone via USB or Wi-Fi")
+                        .font(DS.Typography.labelSmall)
+                        .foregroundStyle(DS.Colors.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DS.Spacing.sm)
+            } else {
+                ForEach(appState.devices) { device in
+                    DeviceRow(
+                        device: device,
+                        isSelected: appState.selectedDeviceUDID == device.udid
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        appState.selectedDeviceUDID = device.udid
                     }
                 }
             }
@@ -77,41 +89,37 @@ struct SidebarView: View {
     @ViewBuilder
     private var tunnelSection: some View {
         if let device = appState.selectedDevice, device.needsTunnel {
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Developer Tunnel", systemImage: "network")
-                        .font(.headline)
+            CollapsibleSection(
+                title: "Developer Tunnel",
+                icon: "network",
+                storageKey: "sidebar.tunnel.expanded",
+                badge: device.tunnelStatus == "connected" ? "Connected" : "Required",
+                badgeColor: device.tunnelStatus == "connected" ? DS.Colors.success : DS.Colors.warning
+            ) {
+                StatusBadge(
+                    label: device.tunnelStatus == "connected"
+                        ? "Tunnel connected"
+                        : "Tunnel required for iOS 17+",
+                    color: device.tunnelStatus == "connected" ? DS.Colors.success : DS.Colors.warning,
+                    size: .small
+                )
 
-                    Divider()
-
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(device.tunnelStatus == "connected" ? Color.green : Color.orange)
-                            .frame(width: 8, height: 8)
-                        Text(device.tunnelStatus == "connected"
-                             ? "Tunnel connected"
-                             : "Tunnel required for iOS 17+")
-                            .font(.caption)
-                    }
-
-                    if device.tunnelStatus != "connected" {
-                        Button {
-                            Task {
-                                await deviceManager?.startTunnel()
-                            }
-                        } label: {
-                            Label("Start Tunnel", systemImage: "network.badge.shield.half.filled")
-                                .frame(maxWidth: .infinity)
+                if device.tunnelStatus != "connected" {
+                    ActionButton(
+                        title: "Start Tunnel",
+                        icon: "network.badge.shield.half.filled",
+                        style: .warning,
+                        isLoading: appState.isLoading
+                    ) {
+                        Task {
+                            await deviceManager?.startTunnel()
                         }
-                        .controlSize(.large)
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
-                        .disabled(appState.isLoading)
-
-                        Text("Admin password will be required to start the tunnel daemon.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
                     }
+                    .disabled(appState.isLoading)
+
+                    Text("Admin password will be required to start the tunnel daemon.")
+                        .font(DS.Typography.labelSmall)
+                        .foregroundStyle(DS.Colors.textTertiary)
                 }
             }
         }
@@ -120,54 +128,55 @@ struct SidebarView: View {
     // MARK: - Location Section
 
     private var locationSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Location", systemImage: "location")
-                    .font(.headline)
+        CollapsibleSection(
+            title: "Location",
+            icon: "location",
+            storageKey: "sidebar.location.expanded"
+        ) {
+            CoordinateInputView(appState: appState)
 
-                Divider()
+            let deviceReady = appState.selectedDevice?.isTunnelReady ?? false
 
-                CoordinateInputView(appState: appState)
-
-                let deviceReady = appState.selectedDevice?.isTunnelReady ?? false
-
-                Button {
-                    guard let coord = appState.targetCoordinate else { return }
-                    Task {
-                        await deviceManager?.setLocation(
-                            latitude: coord.latitude,
-                            longitude: coord.longitude
-                        )
-                    }
-                } label: {
-                    Label("Set Location", systemImage: "location.fill")
-                        .frame(maxWidth: .infinity)
+            ActionButton(
+                title: "Set Location",
+                icon: "location.fill",
+                style: .primary,
+                isLoading: appState.isLoading
+            ) {
+                guard let coord = appState.targetCoordinate else { return }
+                Task {
+                    await deviceManager?.setLocation(
+                        latitude: coord.latitude,
+                        longitude: coord.longitude
+                    )
                 }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    appState.targetCoordinate == nil
-                    || appState.selectedDevice == nil
-                    || !deviceReady
-                    || appState.isLoading
-                )
+            }
+            .disabled(
+                appState.targetCoordinate == nil
+                || appState.selectedDevice == nil
+                || !deviceReady
+                || appState.isLoading
+            )
 
-                Button {
-                    Task {
-                        await deviceManager?.clearLocation()
-                    }
-                } label: {
-                    Label("Clear Location", systemImage: "location.slash")
-                        .frame(maxWidth: .infinity)
+            ActionButton(
+                title: "Clear Location",
+                icon: "location.slash",
+                style: .secondary
+            ) {
+                Task {
+                    await deviceManager?.clearLocation()
                 }
-                .controlSize(.large)
-                .buttonStyle(.bordered)
-                .disabled(!appState.isSimulating || appState.isLoading)
+            }
+            .disabled(!appState.isSimulating || appState.isLoading)
 
-                if let device = appState.selectedDevice, !deviceReady {
+            if let _ = appState.selectedDevice, !deviceReady {
+                HStack(spacing: DS.Spacing.xxs) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(DS.Colors.warning)
                     Text("Start the developer tunnel first to enable location simulation.")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .font(DS.Typography.labelSmall)
+                        .foregroundStyle(DS.Colors.warning)
                 }
             }
         }
@@ -176,185 +185,187 @@ struct SidebarView: View {
     // MARK: - Route Planner Section
 
     private var routePlannerSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Route Planner", systemImage: "point.topLeft.down.to.point.bottomRight.curvePath.fill")
-                    .font(.headline)
+        CollapsibleSection(
+            title: "Route Planner",
+            icon: "point.topLeft.down.to.point.bottomRight.curvePath.fill",
+            storageKey: "sidebar.route.expanded",
+            badge: appState.routeWaypoints.isEmpty ? nil : "\(appState.routeWaypoints.count) pts"
+        ) {
+            // Edit Route toggle
+            ActionButton(
+                title: appState.isEditingRoute ? "Done Editing" : "Add Waypoints",
+                icon: appState.isEditingRoute ? "checkmark.circle" : "plus.circle",
+                style: appState.isEditingRoute ? .warning : .primary
+            ) {
+                appState.isEditingRoute.toggle()
+            }
+            .disabled(appState.isFollowingRoute)
 
-                Divider()
-
-                // Edit Route toggle button
-                Button {
-                    appState.isEditingRoute.toggle()
-                } label: {
-                    Label(
-                        appState.isEditingRoute ? "Done Editing" : "Add Waypoints",
-                        systemImage: appState.isEditingRoute ? "checkmark.circle" : "plus.circle"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
-                .tint(appState.isEditingRoute ? .orange : .accentColor)
-                .disabled(appState.isFollowingRoute)
-
-                if appState.isEditingRoute {
+            if appState.isEditingRoute {
+                HStack(spacing: DS.Spacing.xxs) {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 10))
                     Text("Tap the map to add waypoints")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(DS.Typography.labelSmall)
                 }
+                .foregroundStyle(DS.Colors.textTertiary)
+            }
 
-                // Waypoint list
-                if !appState.routeWaypoints.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(Array(appState.routeWaypoints.enumerated()), id: \.element.id) { index, waypoint in
-                            HStack(spacing: 6) {
-                                Text("\(index + 1).")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(
-                                        appState.isFollowingRoute && appState.currentRouteWaypointIndex == index
-                                            ? Color.accentColor
-                                            : Color.primary
-                                    )
+            // Waypoint list
+            if !appState.routeWaypoints.isEmpty {
+                VStack(alignment: .leading, spacing: DS.Spacing.xxxs) {
+                    ForEach(Array(appState.routeWaypoints.enumerated()), id: \.element.id) { index, waypoint in
+                        HStack(spacing: DS.Spacing.xs) {
+                            // Numbered circle
+                            ZStack {
+                                Circle()
+                                    .fill(waypointRowColor(for: index))
+                                    .frame(width: 22, height: 22)
+                                Text("\(index + 1)")
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                            }
 
-                                VStack(alignment: .leading, spacing: 0) {
-                                    if let name = waypoint.name {
-                                        Text(name)
-                                            .font(.caption)
-                                            .lineLimit(1)
-                                    }
-                                    Text(String(format: "%.5f, %.5f", waypoint.coordinate.latitude, waypoint.coordinate.longitude))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 0) {
+                                if let name = waypoint.name {
+                                    Text(name)
+                                        .font(DS.Typography.label)
                                         .lineLimit(1)
                                 }
-
-                                Spacer()
-
-                                Button {
-                                    appState.routeWaypoints.remove(at: index)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .font(.caption)
-                                        .foregroundStyle(.red)
-                                }
-                                .buttonStyle(.borderless)
-                                .disabled(appState.isFollowingRoute)
+                                Text(String(format: "%.5f, %.5f", waypoint.coordinate.latitude, waypoint.coordinate.longitude))
+                                    .font(DS.Typography.labelSmall)
+                                    .foregroundStyle(DS.Colors.textTertiary)
+                                    .lineLimit(1)
                             }
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(
-                                        appState.isFollowingRoute && appState.currentRouteWaypointIndex == index
-                                            ? Color.accentColor.opacity(0.1)
-                                            : Color.clear
-                                    )
-                            )
-                        }
-                    }
 
-                    Divider()
-
-                    // Speed setting
-                    HStack {
-                        Text("Speed:")
-                            .font(.caption)
-                        Spacer()
-                        Picker("", selection: $useCustomSpeed) {
-                            Text("Preset").tag(false)
-                            Text("Custom").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 140)
-                    }
-
-                    if useCustomSpeed {
-                        HStack(spacing: 4) {
-                            TextField("Speed", value: Binding(
-                                get: { movementEngine?.customSpeedKmh ?? 5.0 },
-                                set: { movementEngine?.customSpeedKmh = $0 }
-                            ), format: .number.precision(.fractionLength(1)))
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 70)
-                            Text("km/h")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Picker("Speed", selection: Binding(
-                            get: { movementEngine?.speedMode ?? .walk },
-                            set: { movementEngine?.speedMode = $0 }
-                        )) {
-                            ForEach(MovementEngine.SpeedMode.allCases) { mode in
-                                Label(mode.rawValue, systemImage: mode.icon)
-                                    .tag(mode)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                    }
-
-                    // Loop toggle
-                    Toggle("Loop Route", isOn: Binding(
-                        get: { appState.shouldLoopRoute },
-                        set: { appState.shouldLoopRoute = $0 }
-                    ))
-                    .font(.caption)
-                    .disabled(appState.isFollowingRoute)
-
-                    // Start / Stop buttons
-                    if appState.routeWaypoints.count >= 2 {
-                        let deviceReady = appState.selectedDevice?.isTunnelReady ?? false
-
-                        HStack(spacing: 8) {
-                            Button {
-                                Task {
-                                    movementEngine?.followRoute(waypoints: appState.routeWaypoints)
-                                }
-                            } label: {
-                                Label("Start Route", systemImage: "play.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .controlSize(.large)
-                            .buttonStyle(.borderedProminent)
-                            .tint(.green)
-                            .disabled(
-                                appState.selectedDevice == nil
-                                || !deviceReady
-                                || appState.isFollowingRoute
-                                || appState.routeWaypoints.count < 2
-                                || appState.isLoading
-                            )
+                            Spacer()
 
                             Button {
-                                Task {
-                                    movementEngine?.stopRoute()
-                                }
+                                appState.routeWaypoints.remove(at: index)
                             } label: {
-                                Label("Stop Route", systemImage: "stop.fill")
-                                    .frame(maxWidth: .infinity)
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(DS.Colors.textTertiary)
+                                    .frame(width: 20, height: 20)
+                                    .background(DS.Colors.textPrimary.opacity(0.06), in: Circle())
                             }
-                            .controlSize(.large)
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                            .disabled(!appState.isFollowingRoute || appState.isLoading)
+                            .buttonStyle(.plain)
+                            .disabled(appState.isFollowingRoute)
                         }
+                        .padding(.vertical, DS.Spacing.xxs)
+                        .padding(.horizontal, DS.Spacing.xs)
+                        .background(
+                            RoundedRectangle(cornerRadius: DS.Radius.sm)
+                                .fill(
+                                    appState.isFollowingRoute && appState.currentRouteWaypointIndex == index
+                                        ? DS.Colors.active.opacity(0.08)
+                                        : Color.clear
+                                )
+                        )
                     }
-
-                    // Clear All button
-                    Button {
-                        appState.routeWaypoints.removeAll()
-                        appState.isEditingRoute = false
-                        appState.currentRouteWaypointIndex = 0
-                    } label: {
-                        Label("Clear Route", systemImage: "trash")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .controlSize(.large)
-                    .buttonStyle(.bordered)
-                    .disabled(appState.isFollowingRoute)
                 }
+
+                Divider()
+                    .padding(.vertical, DS.Spacing.xxs)
+
+                // Speed setting
+                HStack {
+                    Text("Speed:")
+                        .font(DS.Typography.label)
+                        .foregroundStyle(DS.Colors.textSecondary)
+                    Spacer()
+                    Picker("", selection: $useCustomSpeed) {
+                        Text("Preset").tag(false)
+                        Text("Custom").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 140)
+                }
+
+                if useCustomSpeed {
+                    HStack(spacing: DS.Spacing.xxs) {
+                        TextField("Speed", value: Binding(
+                            get: { movementEngine?.customSpeedKmh ?? 5.0 },
+                            set: { movementEngine?.customSpeedKmh = $0 }
+                        ), format: .number.precision(.fractionLength(1)))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 70)
+                        Text("km/h")
+                            .font(DS.Typography.label)
+                            .foregroundStyle(DS.Colors.textTertiary)
+                    }
+                } else {
+                    Picker("Speed", selection: Binding(
+                        get: { movementEngine?.speedMode ?? .walk },
+                        set: { movementEngine?.speedMode = $0 }
+                    )) {
+                        ForEach(MovementEngine.SpeedMode.allCases) { mode in
+                            Label(mode.rawValue, systemImage: mode.icon)
+                                .tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+
+                // Loop toggle
+                Toggle(isOn: Binding(
+                    get: { appState.shouldLoopRoute },
+                    set: { appState.shouldLoopRoute = $0 }
+                )) {
+                    HStack(spacing: DS.Spacing.xxs) {
+                        Image(systemName: "repeat")
+                            .font(.system(size: 10))
+                        Text("Loop Route")
+                            .font(DS.Typography.label)
+                    }
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .disabled(appState.isFollowingRoute)
+
+                // Start / Stop buttons
+                if appState.routeWaypoints.count >= 2 {
+                    let deviceReady = appState.selectedDevice?.isTunnelReady ?? false
+
+                    HStack(spacing: DS.Spacing.xs) {
+                        ActionButton(
+                            title: "Start",
+                            icon: "play.fill",
+                            style: .success
+                        ) {
+                            movementEngine?.followRoute(waypoints: appState.routeWaypoints)
+                        }
+                        .disabled(
+                            appState.selectedDevice == nil
+                            || !deviceReady
+                            || appState.isFollowingRoute
+                            || appState.routeWaypoints.count < 2
+                            || appState.isLoading
+                        )
+
+                        ActionButton(
+                            title: "Stop",
+                            icon: "stop.fill",
+                            style: .destructive
+                        ) {
+                            movementEngine?.stopRoute()
+                        }
+                        .disabled(!appState.isFollowingRoute || appState.isLoading)
+                    }
+                }
+
+                // Clear All button
+                ActionButton(
+                    title: "Clear Route",
+                    icon: "trash",
+                    style: .secondary
+                ) {
+                    appState.routeWaypoints.removeAll()
+                    appState.isEditingRoute = false
+                    appState.currentRouteWaypointIndex = 0
+                }
+                .disabled(appState.isFollowingRoute)
             }
         }
     }
@@ -362,82 +373,94 @@ struct SidebarView: View {
     // MARK: - GPX Section
 
     private var gpxSection: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("GPX Playback", systemImage: "point.topLeft.down.to.point.bottomRight.curvePath")
-                    .font(.headline)
-
-                Divider()
-
-                Button {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.init(filenameExtension: "gpx")!]
-                    panel.allowsMultipleSelection = false
-                    panel.canChooseDirectories = false
-                    panel.message = "Select a GPX file for route playback"
-                    if panel.runModal() == .OK, let url = panel.url {
-                        gpxFilePath = url.path
-                    }
-                } label: {
-                    Label("Load GPX File...", systemImage: "doc.badge.plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .controlSize(.large)
-                .buttonStyle(.bordered)
-
-                if let path = gpxFilePath {
-                    Text(URL(fileURLWithPath: path).lastPathComponent)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-
-                    HStack {
-                        Text("Speed:")
-                            .font(.caption)
-                        Picker("Speed", selection: $playbackSpeed) {
-                            Text("1x").tag(1.0)
-                            Text("2x").tag(2.0)
-                            Text("5x").tag(5.0)
-                            Text("10x").tag(10.0)
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button {
-                            Task {
-                                await deviceManager?.playGPX(path: path, speed: playbackSpeed)
-                            }
-                        } label: {
-                            Label("Play", systemImage: "play.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .controlSize(.large)
-                        .buttonStyle(.borderedProminent)
-                        .tint(.green)
-                        .disabled(
-                            appState.selectedDevice == nil
-                            || appState.isLoading
-                            || appState.isPlayingGPX
-                        )
-
-                        Button {
-                            Task {
-                                await deviceManager?.stopPlayback()
-                            }
-                        } label: {
-                            Label("Stop", systemImage: "stop.fill")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .controlSize(.large)
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                        .disabled(!appState.isPlayingGPX || appState.isLoading)
-                    }
+        CollapsibleSection(
+            title: "GPX Playback",
+            icon: "point.topLeft.down.to.point.bottomRight.curvePath",
+            storageKey: "sidebar.gpx.expanded",
+            defaultExpanded: false
+        ) {
+            ActionButton(
+                title: "Load GPX File...",
+                icon: "doc.badge.plus",
+                style: .secondary
+            ) {
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.init(filenameExtension: "gpx")!]
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.message = "Select a GPX file for route playback"
+                if panel.runModal() == .OK, let url = panel.url {
+                    gpxFilePath = url.path
                 }
             }
+
+            if let path = gpxFilePath {
+                HStack(spacing: DS.Spacing.xs) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DS.Colors.textTertiary)
+                    Text(URL(fileURLWithPath: path).lastPathComponent)
+                        .font(DS.Typography.label)
+                        .foregroundStyle(DS.Colors.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                HStack {
+                    Text("Speed:")
+                        .font(DS.Typography.label)
+                        .foregroundStyle(DS.Colors.textSecondary)
+                    Picker("Speed", selection: $playbackSpeed) {
+                        Text("1x").tag(1.0)
+                        Text("2x").tag(2.0)
+                        Text("5x").tag(5.0)
+                        Text("10x").tag(10.0)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                }
+
+                HStack(spacing: DS.Spacing.xs) {
+                    ActionButton(
+                        title: "Play",
+                        icon: "play.fill",
+                        style: .success
+                    ) {
+                        Task {
+                            await deviceManager?.playGPX(path: path, speed: playbackSpeed)
+                        }
+                    }
+                    .disabled(
+                        appState.selectedDevice == nil
+                        || appState.isLoading
+                        || appState.isPlayingGPX
+                    )
+
+                    ActionButton(
+                        title: "Stop",
+                        icon: "stop.fill",
+                        style: .destructive
+                    ) {
+                        Task {
+                            await deviceManager?.stopPlayback()
+                        }
+                    }
+                    .disabled(!appState.isPlayingGPX || appState.isLoading)
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func waypointRowColor(for index: Int) -> Color {
+        guard appState.isFollowingRoute else { return DS.Colors.route }
+        if index < appState.currentRouteWaypointIndex {
+            return DS.Colors.success
+        } else if index == appState.currentRouteWaypointIndex {
+            return DS.Colors.warning
+        } else {
+            return DS.Colors.route
         }
     }
 }
@@ -449,39 +472,48 @@ private struct DeviceRow: View {
     let isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "iphone")
-                .font(.title3)
-                .foregroundStyle(isSelected ? .white : .secondary)
+        HStack(spacing: DS.Spacing.sm) {
+            // Accent left border
+            RoundedRectangle(cornerRadius: 2)
+                .fill(isSelected ? DS.Colors.active : Color.clear)
+                .frame(width: 3)
+                .padding(.vertical, DS.Spacing.xxs)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
+            Image(systemName: "iphone")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(isSelected ? DS.Colors.active : DS.Colors.textTertiary)
+
+            VStack(alignment: .leading, spacing: DS.Spacing.xxxs) {
+                HStack(spacing: DS.Spacing.xs) {
                     Text(device.name)
-                        .font(.subheadline)
+                        .font(DS.Typography.label)
                         .fontWeight(.medium)
-                        .foregroundStyle(isSelected ? .white : .primary)
+                        .foregroundStyle(DS.Colors.textPrimary)
 
                     if device.needsTunnel {
-                        Circle()
-                            .fill(device.tunnelStatus == "connected" ? Color.green : Color.orange)
-                            .frame(width: 6, height: 6)
+                        StatusBadge(
+                            label: device.tunnelStatus == "connected" ? "Ready" : "Tunnel",
+                            color: device.tunnelStatus == "connected" ? DS.Colors.success : DS.Colors.warning,
+                            size: .small
+                        )
                     }
                 }
                 Text("\(device.productType) \u{2022} iOS \(device.osVersion)")
-                    .font(.caption)
-                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                    .font(DS.Typography.labelSmall)
+                    .foregroundStyle(DS.Colors.textTertiary)
             }
 
             Spacer()
 
             Image(systemName: device.connectionType == "USB" ? "cable.connector" : "wifi")
-                .font(.caption)
-                .foregroundStyle(isSelected ? Color.white.opacity(0.8) : Color.gray.opacity(0.5))
+                .font(.system(size: 10))
+                .foregroundStyle(DS.Colors.textTertiary)
         }
-        .padding(8)
+        .padding(.vertical, DS.Spacing.xs)
+        .padding(.trailing, DS.Spacing.xs)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor : Color.clear)
+            RoundedRectangle(cornerRadius: DS.Radius.sm)
+                .fill(isSelected ? DS.Colors.active.opacity(0.08) : Color.clear)
         )
     }
 }
