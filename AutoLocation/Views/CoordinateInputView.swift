@@ -6,6 +6,11 @@ struct CoordinateInputView: View {
 
     @State private var latitudeText: String = ""
     @State private var longitudeText: String = ""
+    @FocusState private var latFocused: Bool
+    @FocusState private var lonFocused: Bool
+
+    /// Tracks whether the user is actively editing, to avoid reformatting mid-type.
+    private var isEditing: Bool { latFocused || lonFocused }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -15,9 +20,8 @@ struct CoordinateInputView: View {
                     .font(.caption)
                 TextField("Latitude", text: $latitudeText)
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: latitudeText) {
-                        updateCoordinate()
-                    }
+                    .focused($latFocused)
+                    .onSubmit { updateCoordinate() }
             }
             HStack {
                 Text("Lon:")
@@ -25,18 +29,22 @@ struct CoordinateInputView: View {
                     .font(.caption)
                 TextField("Longitude", text: $longitudeText)
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: longitudeText) {
-                        updateCoordinate()
-                    }
+                    .focused($lonFocused)
+                    .onSubmit { updateCoordinate() }
             }
         }
+        .onChange(of: latFocused) { _, focused in
+            if !focused { updateCoordinate() }
+        }
+        .onChange(of: lonFocused) { _, focused in
+            if !focused { updateCoordinate() }
+        }
         .onChange(of: appState.targetCoordinate) { _, newValue in
-            if let coord = newValue {
-                let newLat = String(format: "%.6f", coord.latitude)
-                let newLon = String(format: "%.6f", coord.longitude)
-                if newLat != latitudeText { latitudeText = newLat }
-                if newLon != longitudeText { longitudeText = newLon }
-            }
+            guard !isEditing, let coord = newValue else { return }
+            let newLat = String(format: "%.6f", coord.latitude)
+            let newLon = String(format: "%.6f", coord.longitude)
+            if newLat != latitudeText { latitudeText = newLat }
+            if newLon != longitudeText { longitudeText = newLon }
         }
     }
 
