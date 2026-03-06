@@ -43,11 +43,12 @@ jobs:
             -configuration Release \
             -archivePath build/AutoLocation.xcarchive \
             CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=YES
 
       - name: Package app
         run: |
           cp -R build/AutoLocation.xcarchive/Products/Applications/AutoLocation.app build/AutoLocation.app
+          codesign --force --deep --sign - build/AutoLocation.app
           cd build
           zip -r -y AutoLocation-macos.zip AutoLocation.app
 
