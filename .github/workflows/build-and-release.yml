@@ -26,7 +26,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          pip install pymobiledevice3 pyinstaller
+          pip install -r requirements.txt pyinstaller
           chmod +x build_bridge.sh
           ./build_bridge.sh
 
