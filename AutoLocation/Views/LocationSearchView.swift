@@ -94,6 +94,7 @@ struct LocationSearchView: View {
             showResults = !newValue.isEmpty
         }
         .onChange(of: isSearchFocused) { _, focused in
+            appState.isSearchFieldFocused = focused
             if !focused {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     showResults = false

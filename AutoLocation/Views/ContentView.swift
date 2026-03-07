@@ -48,7 +48,8 @@ struct ContentView: View {
             .focusable()
             .focused($isMapFocused)
             .onKeyPress(phases: .down) { press in
-                if let dir = MovementDirection.from(press) {
+                let allowWASD = !appState.isSearchFieldFocused
+                if let dir = MovementDirection.from(press, allowWASD: allowWASD) {
                     activeDirections.insert(dir)
                     updateKeyboardMovement()
                     return .handled
@@ -56,12 +57,19 @@ struct ContentView: View {
                 return .ignored
             }
             .onKeyPress(phases: .up) { press in
-                if let dir = MovementDirection.from(press) {
+                let allowWASD = !appState.isSearchFieldFocused
+                if let dir = MovementDirection.from(press, allowWASD: allowWASD) {
                     activeDirections.remove(dir)
                     updateKeyboardMovement()
                     return .handled
                 }
                 return .ignored
+            }
+            .onChange(of: appState.isSearchFieldFocused) { _, focused in
+                if focused && !activeDirections.isEmpty {
+                    activeDirections.removeAll()
+                    updateKeyboardMovement()
+                }
             }
             .onAppear { isMapFocused = true }
         }
@@ -98,12 +106,16 @@ struct ContentView: View {
 enum MovementDirection: Hashable {
     case north, south, east, west
 
-    static func from(_ press: KeyPress) -> MovementDirection? {
+    static func from(_ press: KeyPress, allowWASD: Bool = true) -> MovementDirection? {
         switch press.key {
-        case .upArrow, KeyEquivalent("w"):    return .north
-        case .downArrow, KeyEquivalent("s"):  return .south
-        case .rightArrow, KeyEquivalent("d"): return .east
-        case .leftArrow, KeyEquivalent("a"):  return .west
+        case .upArrow:                            return .north
+        case .downArrow:                          return .south
+        case .rightArrow:                         return .east
+        case .leftArrow:                          return .west
+        case KeyEquivalent("w") where allowWASD:  return .north
+        case KeyEquivalent("s") where allowWASD:  return .south
+        case KeyEquivalent("d") where allowWASD:  return .east
+        case KeyEquivalent("a") where allowWASD:  return .west
         default: return nil
         }
     }

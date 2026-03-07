@@ -20,6 +20,7 @@ class AppState {
     var tunnelCommand: String? = nil  // Command to show user for starting tunnel
 
     var isMovementActive: Bool = false
+    var isSearchFieldFocused: Bool = false
 
     // Route planner
     var routeWaypoints: [Waypoint] = []
