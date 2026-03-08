@@ -226,11 +226,24 @@ def cmd_start_tunnel() -> dict:
     # Check if tunneld is already running
     try:
         if _tunneld_available:
-            devices = get_tunneld_devices()
-            return ok_response(
-                message=f"Tunnel daemon already running ({len(devices)} device(s) tunneled)",
-                tunnelRunning=True,
-            )
+            result = [None]
+            error = [None]
+
+            def _check():
+                try:
+                    result[0] = get_tunneld_devices()
+                except Exception as e:
+                    error[0] = e
+
+            t = threading.Thread(target=_check, daemon=True)
+            t.start()
+            t.join(timeout=3)
+            if not t.is_alive() and error[0] is None:
+                devices = result[0]
+                return ok_response(
+                    message=f"Tunnel daemon already running ({len(devices)} device(s) tunneled)",
+                    tunnelRunning=True,
+                )
     except Exception:
         pass
 
@@ -256,7 +269,21 @@ def cmd_check_tunnel() -> dict:
         return ok_response(tunnelRunning=False, message="tunneld API not available")
 
     try:
-        devices = get_tunneld_devices()
+        result = [None]
+        error = [None]
+
+        def _check():
+            try:
+                result[0] = get_tunneld_devices()
+            except Exception as e:
+                error[0] = e
+
+        t = threading.Thread(target=_check, daemon=True)
+        t.start()
+        t.join(timeout=3)
+        if t.is_alive() or error[0] is not None:
+            raise Exception(error[0] or "Tunnel check timed out")
+        devices = result[0]
         return ok_response(
             tunnelRunning=True,
             deviceCount=len(devices),
@@ -285,8 +312,26 @@ def _get_tunnel_status(serial: str, ios_major: int) -> str:
     if not _tunneld_available:
         return "not_connected"
     try:
-        rsd = get_tunneld_device_by_udid(serial)
-        return "connected" if rsd is not None else "not_connected"
+        # Run the tunneld check in a daemon thread with a timeout to prevent
+        # hanging when the tunneld daemon is not running (the API blocks forever).
+        result = [None]
+        error = [None]
+
+        def _check():
+            try:
+                result[0] = get_tunneld_device_by_udid(serial)
+            except Exception as e:
+                error[0] = e
+
+        t = threading.Thread(target=_check, daemon=True)
+        t.start()
+        t.join(timeout=3)
+        if t.is_alive():
+            # Timed out — tunneld is not responding
+            return "not_connected"
+        if error[0] is not None:
+            return "not_connected"
+        return "connected" if result[0] is not None else "not_connected"
     except Exception:
         return "not_connected"
 

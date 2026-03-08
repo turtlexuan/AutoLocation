@@ -92,16 +92,19 @@ class DeviceManager {
             return
         }
 
-        appState.statusMessage = "Starting tunnel (password may be required)..."
+        appState.statusMessage = "Starting tunnel (admin password required)..."
 
+        // Single AppleScript: force-kill stale tunneld processes (SIGKILL since
+        // zombie processes ignore SIGTERM), wait for port release, then start fresh.
+        // One password prompt instead of two.
         let tunnelCommand = findTunnelCommand()
         let logPath = NSTemporaryDirectory() + "autolocation_tunnel.log"
         print("[DeviceManager] Tunnel command: \(tunnelCommand)")
 
-        let scriptSource = buildAppleScript(command: tunnelCommand, logPath: logPath)
-        print("[DeviceManager] AppleScript: \(scriptSource)")
+        let combinedScript = buildCombinedTunnelScript(command: tunnelCommand, logPath: logPath)
+        print("[DeviceManager] AppleScript: \(combinedScript)")
 
-        guard await runOsascript(scriptSource) else {
+        guard await runOsascript(combinedScript) else {
             appState.statusMessage = "Tunnel start cancelled or failed"
             return
         }
@@ -114,7 +117,7 @@ class DeviceManager {
     }
 
     private func isTunnelAlreadyRunning() async -> Bool {
-        guard let response = try? await bridge.send(command: ["command": "check_tunnel"]),
+        guard let response = try? await bridge.send(command: ["command": "check_tunnel"], timeout: .seconds(5)),
               response["tunnelRunning"] as? Bool == true else {
             return false
         }
@@ -123,12 +126,16 @@ class DeviceManager {
         return true
     }
 
-    private func buildAppleScript(command: String, logPath: String) -> String {
+    /// Build a single AppleScript that kills stale tunneld, waits, and starts a new one.
+    /// Uses one `with administrator privileges` block so the user only sees one password prompt.
+    private func buildCombinedTunnelScript(command: String, logPath: String) -> String {
         let escapedCommand = command.replacingOccurrences(of: "\\", with: "\\\\")
                                     .replacingOccurrences(of: "\"", with: "\\\"")
         let escapedLogPath = logPath.replacingOccurrences(of: "\\", with: "\\\\")
                                     .replacingOccurrences(of: "\"", with: "\\\"")
-        return "do shell script \"\(escapedCommand) > '\(escapedLogPath)' 2>&1 &\" with administrator privileges"
+        // SIGKILL (-9) because zombie tunneld processes ignore SIGTERM.
+        // Kill existing tunneld, wait for port release, then start new one — all in one sudo shell.
+        return "do shell script \"pkill -9 -f tunneld 2>/dev/null; sleep 2; \(escapedCommand) > '\(escapedLogPath)' 2>&1 &\" with administrator privileges"
     }
 
     /// Polls up to ~20 seconds for the tunnel to become ready. Returns true if tunnel started.
@@ -141,7 +148,7 @@ class DeviceManager {
         for attempt in 1...maxAttempts {
             try? await Task.sleep(for: pollInterval)
 
-            if let response = try? await bridge.send(command: ["command": "check_tunnel"]),
+            if let response = try? await bridge.send(command: ["command": "check_tunnel"], timeout: .seconds(5)),
                response["tunnelRunning"] as? Bool == true {
                 appState.tunnelCommand = nil
                 appState.statusMessage = "Tunnel started successfully"

@@ -41,7 +41,7 @@ source "$VENV_DIR/bin/activate"
 # ---------------------------------------------------------------------------
 echo "[build_bridge] Installing/upgrading pip dependencies..."
 pip install --quiet --upgrade pip
-pip install --quiet "pymobiledevice3>=2.0.0,<8.0.0"
+pip install --quiet "pymobiledevice3>=2.0.0,<7.7.0"
 pip install --quiet pyinstaller
 
 # ---------------------------------------------------------------------------

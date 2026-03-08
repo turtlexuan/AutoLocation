@@ -109,7 +109,7 @@ actor PythonBridge {
 
     // MARK: - Command / Response
 
-    func send(command: [String: Any]) async throws -> [String: Any] {
+    func send(command: [String: Any], timeout: Duration = .seconds(15)) async throws -> [String: Any] {
         guard isRunning, let stdinPipe = stdinPipe else {
             throw BridgeError.processNotRunning
         }
@@ -120,10 +120,18 @@ actor PythonBridge {
         }
         line += "\n"
 
+        // Send the command and wait for response with a timeout.
+        // The continuation is stored on the actor so the stdout reader can resume it.
         let response: [String: Any] = try await withCheckedThrowingContinuation { continuation in
             self.responseHandler = continuation
             if let data = line.data(using: .utf8) {
                 stdinPipe.fileHandleForWriting.write(data)
+            }
+
+            // Schedule a timeout that fails the continuation if no response arrives
+            Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                await self?.timeoutPendingRequest()
             }
         }
 
@@ -134,6 +142,14 @@ actor PythonBridge {
         }
 
         return response
+    }
+
+    /// Fail the pending request if it's still waiting (timeout).
+    private func timeoutPendingRequest() {
+        if let handler = responseHandler {
+            responseHandler = nil
+            handler.resume(throwing: BridgeError.bridgeError("Command timed out"))
+        }
     }
 
     // MARK: - Find Bundled Bridge
