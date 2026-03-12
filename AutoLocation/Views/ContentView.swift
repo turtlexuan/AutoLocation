@@ -5,13 +5,14 @@ struct ContentView: View {
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
     var locationSearchService: LocationSearchService
+    var favoritesManager: FavoritesManager
 
     @FocusState private var isMapFocused: Bool
     @State private var activeDirections: Set<MovementDirection> = []
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(appState: appState, deviceManager: deviceManager, movementEngine: movementEngine)
+            SidebarView(appState: appState, deviceManager: deviceManager, movementEngine: movementEngine, favoritesManager: favoritesManager)
                 .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
         } detail: {
             VStack(spacing: 0) {

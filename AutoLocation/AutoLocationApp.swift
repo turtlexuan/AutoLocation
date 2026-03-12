@@ -6,6 +6,7 @@ struct AutoLocationApp: App {
     @State private var deviceManager: DeviceManager?
     @State private var movementEngine: MovementEngine?
     @State private var locationSearchService = LocationSearchService()
+    @State private var favoritesManager = FavoritesManager()
 
     var body: some Scene {
         WindowGroup {
@@ -13,7 +14,8 @@ struct AutoLocationApp: App {
                 appState: appState,
                 deviceManager: deviceManager,
                 movementEngine: movementEngine,
-                locationSearchService: locationSearchService
+                locationSearchService: locationSearchService,
+                favoritesManager: favoritesManager
             )
             .onAppear {
                 let manager = DeviceManager(appState: appState)

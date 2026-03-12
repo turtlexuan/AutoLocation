@@ -4,10 +4,15 @@ struct SidebarView: View {
     var appState: AppState
     var deviceManager: DeviceManager?
     var movementEngine: MovementEngine?
+    var favoritesManager: FavoritesManager
 
     @State private var gpxFilePath: String?
     @State private var playbackSpeed: Double = 1.0
     @State private var useCustomSpeed: Bool = false
+    @State private var showSaveFavoriteAlert: Bool = false
+    @State private var newFavoriteName: String = ""
+    @State private var editingFavorite: FavoriteLocation? = nil
+    @State private var editingName: String = ""
 
     var body: some View {
         ScrollView {
@@ -15,6 +20,7 @@ struct SidebarView: View {
                 devicesSection
                 tunnelSection
                 locationSection
+                favoritesSection
                 routePlannerSection
                 gpxSection
             }
@@ -178,6 +184,95 @@ struct SidebarView: View {
                         .font(DS.Typography.labelSmall)
                         .foregroundStyle(DS.Colors.warning)
                 }
+            }
+        }
+    }
+
+    // MARK: - Favorites Section
+
+    private var favoritesSection: some View {
+        CollapsibleSection(
+            title: "Favorites",
+            icon: "star.fill",
+            storageKey: "sidebar.favorites.expanded",
+            badge: favoritesManager.favorites.isEmpty ? nil : "\(favoritesManager.favorites.count)"
+        ) {
+            // Save current location button
+            ActionButton(
+                title: "Save Current Location",
+                icon: "star.badge.plus",
+                style: .primary
+            ) {
+                newFavoriteName = ""
+                showSaveFavoriteAlert = true
+            }
+            .disabled(appState.targetCoordinate == nil)
+
+            if favoritesManager.favorites.isEmpty {
+                VStack(spacing: DS.Spacing.xxs) {
+                    Image(systemName: "star.slash")
+                        .font(.system(size: 24))
+                        .foregroundStyle(DS.Colors.textTertiary)
+                    Text("No saved locations")
+                        .font(DS.Typography.label)
+                        .foregroundStyle(DS.Colors.textSecondary)
+                    Text("Select a location on the map, then save it here")
+                        .font(DS.Typography.labelSmall)
+                        .foregroundStyle(DS.Colors.textTertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DS.Spacing.sm)
+            } else {
+                VStack(alignment: .leading, spacing: DS.Spacing.xxxs) {
+                    ForEach(favoritesManager.favorites) { favorite in
+                        FavoriteRow(
+                            favorite: favorite,
+                            onSelect: {
+                                appState.targetCoordinate = favorite.coordinate
+                            },
+                            onRename: {
+                                editingFavorite = favorite
+                                editingName = favorite.name
+                            },
+                            onDelete: {
+                                favoritesManager.remove(favorite)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        .alert("Save Favorite", isPresented: $showSaveFavoriteAlert) {
+            TextField("Location name", text: $newFavoriteName)
+            Button("Save") {
+                guard let coord = appState.targetCoordinate else { return }
+                let name = newFavoriteName.trimmingCharacters(in: .whitespaces)
+                favoritesManager.add(
+                    name: name.isEmpty ? "Untitled" : name,
+                    coordinate: coord
+                )
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let coord = appState.targetCoordinate {
+                Text(String(format: "%.6f, %.6f", coord.latitude, coord.longitude))
+            }
+        }
+        .alert("Rename Favorite", isPresented: Binding(
+            get: { editingFavorite != nil },
+            set: { if !$0 { editingFavorite = nil } }
+        )) {
+            TextField("New name", text: $editingName)
+            Button("Rename") {
+                if let fav = editingFavorite {
+                    let name = editingName.trimmingCharacters(in: .whitespaces)
+                    favoritesManager.rename(fav, to: name.isEmpty ? fav.name : name)
+                }
+                editingFavorite = nil
+            }
+            Button("Cancel", role: .cancel) {
+                editingFavorite = nil
             }
         }
     }
@@ -461,6 +556,71 @@ struct SidebarView: View {
             return DS.Colors.warning
         } else {
             return DS.Colors.route
+        }
+    }
+}
+
+// MARK: - Favorite Row
+
+private struct FavoriteRow: View {
+    let favorite: FavoriteLocation
+    var onSelect: () -> Void
+    var onRename: () -> Void
+    var onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: DS.Spacing.xs) {
+            Image(systemName: "star.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(DS.Colors.warning)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(favorite.name)
+                    .font(DS.Typography.label)
+                    .fontWeight(.medium)
+                    .foregroundStyle(DS.Colors.textPrimary)
+                    .lineLimit(1)
+                Text(String(format: "%.5f, %.5f", favorite.latitude, favorite.longitude))
+                    .font(DS.Typography.labelSmall)
+                    .foregroundStyle(DS.Colors.textTertiary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            HStack(spacing: DS.Spacing.xxs) {
+                Button {
+                    onRename()
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(DS.Colors.textTertiary)
+                        .frame(width: 20, height: 20)
+                        .background(DS.Colors.textPrimary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(DS.Colors.textTertiary)
+                        .frame(width: 20, height: 20)
+                        .background(DS.Colors.textPrimary.opacity(0.06), in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, DS.Spacing.xxs)
+        .padding(.horizontal, DS.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: DS.Radius.sm)
+                .fill(Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onSelect()
         }
     }
 }
