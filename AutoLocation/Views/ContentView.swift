@@ -45,30 +45,41 @@ struct ContentView: View {
                 }
                 StatusBarView(appState: appState)
             }
-            .focusable()
-            .focused($isMapFocused)
-            .onKeyPress(phases: .down) { press in
-                let allowWASD = !appState.isSearchFieldFocused
-                if let dir = MovementDirection.from(press, allowWASD: allowWASD) {
-                    activeDirections.insert(dir)
-                    updateKeyboardMovement()
-                    return .handled
-                }
-                return .ignored
-            }
-            .onKeyPress(phases: .up) { press in
-                let allowWASD = !appState.isSearchFieldFocused
-                if let dir = MovementDirection.from(press, allowWASD: allowWASD) {
-                    activeDirections.remove(dir)
-                    updateKeyboardMovement()
-                    return .handled
-                }
-                return .ignored
+            .background {
+                // Hidden focus catcher: keeps WASD/arrow-key handling without
+                // putting .focusable() in front of the Map's tap gesture.
+                // .focusable() on a parent intercepts clicks for focus
+                // acquisition on macOS, which broke map selection.
+                Color.clear
+                    .focusable()
+                    .focused($isMapFocused)
+                    .onKeyPress(phases: .down) { press in
+                        let allowWASD = !appState.isSearchFieldFocused
+                        if let dir = MovementDirection.from(press, allowWASD: allowWASD) {
+                            activeDirections.insert(dir)
+                            updateKeyboardMovement()
+                            return .handled
+                        }
+                        return .ignored
+                    }
+                    .onKeyPress(phases: .up) { press in
+                        let allowWASD = !appState.isSearchFieldFocused
+                        if let dir = MovementDirection.from(press, allowWASD: allowWASD) {
+                            activeDirections.remove(dir)
+                            updateKeyboardMovement()
+                            return .handled
+                        }
+                        return .ignored
+                    }
             }
             .onChange(of: appState.isSearchFieldFocused) { _, focused in
-                if focused && !activeDirections.isEmpty {
-                    activeDirections.removeAll()
-                    updateKeyboardMovement()
+                if focused {
+                    if !activeDirections.isEmpty {
+                        activeDirections.removeAll()
+                        updateKeyboardMovement()
+                    }
+                } else {
+                    isMapFocused = true
                 }
             }
             .onAppear { isMapFocused = true }
