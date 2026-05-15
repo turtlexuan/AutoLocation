@@ -27,10 +27,13 @@ struct MapContainerView: View {
                     activeRouteSegment
                 }
                 .mapStyle(.standard(elevation: .realistic))
-                .onTapGesture { screenPoint in
-                    guard let coordinate = proxy.convert(screenPoint, from: .local) else { return }
-                    handleMapTap(at: coordinate)
-                }
+                .simultaneousGesture(
+                    SpatialTapGesture(coordinateSpace: .local)
+                        .onEnded { event in
+                            guard let coordinate = proxy.convert(event.location, from: .local) else { return }
+                            handleMapTap(at: coordinate)
+                        }
+                )
             }
 
             // Button stack — bottom trailing
